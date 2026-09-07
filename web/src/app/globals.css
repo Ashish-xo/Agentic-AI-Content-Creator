@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  background: #0b0e14;
+  color: #dbe4ee;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #1f2530 transparent;
+}
+
+.md-body h1, .md-body h2, .md-body h3 { font-weight: 700; margin: 0.8em 0 0.3em; }
+.md-body h1 { font-size: 1.25rem; } .md-body h2 { font-size: 1.1rem; } .md-body h3 { font-size: 1rem; color: #87cade; }
+.md-body p { margin: 0.45em 0; line-height: 1.55; }
+.md-body ul, .md-body ol { margin: 0.4em 0 0.4em 1.3em; }
+.md-body ul { list-style: disc; } .md-body ol { list-style: decimal; }
+.md-body li { margin: 0.2em 0; }
+.md-body strong { color: #fff; font-weight: 650; }
+.md-body code { background: #1f2530; padding: 0.1em 0.35em; border-radius: 4px; font-size: 0.85em; }
+.md-body pre { background: #12161f; border: 1px solid #1f2530; padding: 0.7em; border-radius: 8px; overflow-x: auto; }
+.md-body blockquote { border-left: 3px solid #87cade; padding-left: 0.8em; color: #9fb0c3; margin: 0.5em 0; }
+.md-body table { border-collapse: collapse; margin: 0.6em 0; font-size: 0.9em; }
+.md-body th, .md-body td { border: 1px solid #1f2530; padding: 0.35em 0.7em; }
+.md-body hr { border-color: #1f2530; margin: 0.9em 0; }
