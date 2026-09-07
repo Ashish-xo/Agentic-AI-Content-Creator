@@ -80,6 +80,17 @@ export default function ChatPage() {
           // mode/platform resolved server-side
         } else if (e.type === "onboarding") {
           loadPersona();
+        } else if (e.type === "filter") {
+          const vs = (e.violations as { phrase: string }[]) || [];
+          if (vs.length) {
+            acc += `\n\n> ⚠ **Saturation filter:** flagged ${vs.map((v) => `“${v.phrase}”`).join(", ")} in this reply.`;
+            setMsgs((m) => {
+              const copy = [...m];
+              const last = copy[copy.length - 1];
+              if (last?.role === "assistant") copy[copy.length - 1] = { ...last, content: acc };
+              return copy;
+            });
+          }
         } else if (e.type === "error") {
           acc += `\n\n_(error: ${e.detail})_`;
         }

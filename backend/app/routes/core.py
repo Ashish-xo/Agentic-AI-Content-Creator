@@ -60,12 +60,13 @@ class VariantIn(BaseModel):
 async def gen_hooks(body: HookIn, user_id: str = Depends(current_user),
                    db: Session = Depends(get_db)):
     persona = db.query(Persona).filter(Persona.user_id == user_id).first()
-    items = await generators.generate_hooks(body.topic, body.platform, body.count,
-                                            persona.summary() if persona and persona.completed else None)
+    out = await generators.generate_hooks(body.topic, body.platform, body.count,
+                                          persona.summary() if persona and persona.completed else None,
+                                          db=db)
     db.add(GeneratedItem(user_id=user_id, kind="hook", platform=body.platform,
-                         topic=body.topic, payload={"hooks": items}))
+                         topic=body.topic, payload=out))
     db.commit()
-    return {"hooks": items}
+    return out
 
 
 @router.post("/api/generate/script")

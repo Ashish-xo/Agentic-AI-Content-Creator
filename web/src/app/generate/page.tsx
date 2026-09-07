@@ -36,7 +36,9 @@ export default function GeneratePage() {
     }
   }
 
-  const hooks = (out as { hooks?: { hook: string; archetype: string; rationale: string; thumbnail_text?: string }[] } | null)?.hooks;
+  const hooks = (out as { hooks?: { hook: string; archetype: string; rationale: string; thumbnail_text?: string }[]; rejected?: { phrase: string; reason: string }[]; fewshot_examples_used?: { hook: string; archetype: string }[] } | null)?.hooks;
+  const rejected = (out as { rejected?: { phrase: string; reason: string }[] } | null)?.rejected;
+  const fewshotUsed = (out as { fewshot_examples_used?: { hook: string; archetype: string }[] } | null)?.fewshot_examples_used;
   const script = out as { title?: string; blocks?: { time: string; visual: string; audio: string }[]; cta?: string } | null;
   const crit = out as { score_before?: number; score_after?: number; issues?: { quote: string; problem: string; fix: string }[]; rewritten?: string } | null;
 
@@ -72,6 +74,13 @@ export default function GeneratePage() {
 
       {hooks && (
         <div className="space-y-3">
+          {!!(out as { fewshot_examples_used?: { hook: string; archetype: string }[] })?.fewshot_examples_used?.length && (
+            <div className="rounded-xl border border-edge bg-panel/60 p-3 text-xs text-slate-500">
+              <span className="font-semibold text-slate-400">Few-shot examples analyzed (RAG):</span>{" "}
+              {(out as { fewshot_examples_used: { hook: string }[] }).fewshot_examples_used
+                .map((e) => `“${e.hook.slice(0, 40)}…”`).join(" ")}
+            </div>
+          )}
           {hooks.map((h, i) => (
             <div key={i} className="rounded-xl border border-edge bg-panel p-4">
               <div className="text-[11px] uppercase tracking-wide text-accent2">{h.archetype}{h.thumbnail_text ? ` · thumb: “${h.thumbnail_text}”` : ""}</div>
@@ -79,6 +88,26 @@ export default function GeneratePage() {
               <div className="mt-1 text-sm text-slate-500">{h.rationale}</div>
             </div>
           ))}
+          {!!rejected?.length && (
+            <div className="rounded-xl border border-red-500/30 bg-panel p-4 text-sm">
+              <div className="mb-1 text-[11px] uppercase tracking-wide text-red-400">
+                Filtered out by the saturation gate ({rejected.length})
+              </div>
+              {rejected.map((r, i) => (
+                <div key={i} className="text-slate-400">
+                  <span className="text-red-400 line-through">“{r.phrase}”</span> — {r.reason}
+                </div>
+              ))}
+            </div>
+          )}
+          {!!fewshotUsed?.length && (
+            <div className="rounded-xl border border-edge bg-panel/60 p-4 text-sm">
+              <div className="mb-1 text-[11px] uppercase tracking-wide text-accent">Few-shot examples fed to the model</div>
+              {fewshotUsed.map((e, i) => (
+                <div key={i} className="text-slate-500">“{e.hook}” <span className="text-accent2">· {e.archetype}</span></div>
+              ))}
+            </div>
+          )}
         </div>
       )}
       {tab === "script" && script?.blocks && (

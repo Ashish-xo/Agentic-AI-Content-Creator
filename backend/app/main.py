@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.db.session import Base, SessionLocal, engine
+from app.engine import fewshot
 from app.routes import chat, core
 from app.seed.data import seed
 from app.services import automation
@@ -20,6 +21,7 @@ async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
         seed(db)
+        fewshot.seed_examples(db)
     finally:
         db.close()
     automation.start(SessionLocal)

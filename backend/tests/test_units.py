@@ -49,3 +49,26 @@ def test_onboarding_flow(db_session):
     assert done and q is None
     assert p.completed and p.niche == "fitness"
     assert "fitness" in p.summary().lower()
+
+
+def test_cringe_scan_and_clean():
+    from app.engine import cringe
+    vs = cringe.scan("This game-changer will unlock the secret to going viral 🚀")
+    phrases = {v.phrase for v in vs}
+    assert "game-changer" in phrases and "unlock the secret" in phrases and "🚀" in phrases
+    assert cringe.scan("I replaced 3 editors with a Python script.") == []
+    kept, viol = cringe.clean_items(
+        [{"hook": "delve into my routine"}, {"hook": "I ran 100 miles in 7 days"}], "hook")
+    assert len(kept) == 1 and kept[0]["hook"].startswith("I ran")
+    assert viol and viol[0].phrase == "delve"
+
+
+def test_fewshot_selection_and_block(db_session):
+    from app.engine import fewshot
+    fewshot.seed_examples(db_session)
+    picked = fewshot.select_examples(db_session, "instagram", "12 minute lunch workout", k=3)
+    assert len(picked) == 3
+    assert all(p.platform == "instagram" for p in picked)  # platform bonus dominates
+    block = fewshot.fewshot_block(picked, "home workouts", 5)
+    assert block.startswith("Analyze how these high-retention hooks work:")
+    assert "Now generate 5 hooks for: home workouts" in block

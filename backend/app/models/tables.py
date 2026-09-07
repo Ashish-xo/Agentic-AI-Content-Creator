@@ -119,3 +119,14 @@ class UsageEvent(Base):
     feature: Mapped[str] = mapped_column(String(64))
     tokens: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class HookExample(Base):
+    """Real high-performing hooks used as dynamic few-shot examples (RAG)."""
+
+    __tablename__ = "hook_examples"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    platform: Mapped[str] = mapped_column(String(32), index=True)
+    hook: Mapped[str] = mapped_column(Text)
+    archetype: Mapped[str] = mapped_column(String(64))
+    metric: Mapped[str | None] = mapped_column(Text)  # why it performed

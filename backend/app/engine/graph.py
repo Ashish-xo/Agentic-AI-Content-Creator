@@ -11,7 +11,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.engine import modes, rag
+from app.engine import cringe, modes, rag
 from app.engine.onboarding import LABELS, FIELDS  # noqa: F401  (re-export for routes)
 from app.models.tables import Persona
 from app.services import llm, trends
@@ -20,7 +20,8 @@ SYSTEM_BASE = (
     "You are Content Copilot, an algorithm-aware assistant for creators on "
     "YouTube and Instagram. Reply style: short paragraphs and bullets, bold key "
     "terms, plain markdown, no hype or emoji spam, ONE clear next step at the "
-    "end. Never invent trend numbers — use only the data you are given."
+    "end. Never invent trend numbers — use only the data you are given. "
+    "Never use saturated phrases: " + cringe.banned_list_for_prompt(18) + "."
 )
 
 
@@ -66,6 +67,9 @@ async def run_turn(
     temp = modes.TEMPS.get(mode or "", 0.6)
     budget = modes.BUDGETS.get(mode or "", 2048)
     answer = await llm.complete(msgs, temperature=temp, max_tokens=budget)
+    vs = cringe.scan(answer)
+    if vs:
+        answer += "\n\n> ⚠ filter: " + ", ".join(f'"{v.phrase}"' for v in vs) + " flagged as saturated."
     return answer, rows
 
 
@@ -89,8 +93,14 @@ async def stream_turn(
            ]}
     temp = modes.TEMPS.get(mode or "", 0.6)
     budget = modes.BUDGETS.get(mode or "", 2048)
+    collected: list[str] = []
     async for delta in llm.stream(msgs, temperature=temp, max_tokens=budget):
+        collected.append(delta)
         yield {"type": "delta", "text": delta}
+    # post-processing gate: scan the full answer after streaming completes
+    violations = cringe.scan("".join(collected))
+    if violations:
+        yield {"type": "filter", "violations": cringe.violations_payload(violations)}
     yield {"type": "done"}
 
 

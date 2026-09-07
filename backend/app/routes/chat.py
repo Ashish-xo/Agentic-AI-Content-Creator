@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.auth import current_user
 from app.db.session import get_db
-from app.engine import graph, modes, onboarding
+from app.engine import cringe, graph, modes, onboarding
 from app.models.tables import ChatMessage
 from app.services.ratelimit import chat_limit
 
