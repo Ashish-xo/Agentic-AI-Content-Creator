@@ -77,7 +77,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         ☰
       </button>
 
-      <main className="scroll-ios flex-1 overflow-y-auto pt-14 pb-[76px] md:pt-0 md:pb-0">
+      <main className="scroll-ios flex-1 overflow-y-auto pt-14 pb-[calc(64px+env(safe-area-inset-bottom))] md:pt-0 md:pb-0">
         {children}
       </main>
 
