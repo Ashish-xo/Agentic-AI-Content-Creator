@@ -16,10 +16,10 @@ export default function Dashboard() {
   }, []);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6 p-4 pb-24 md:p-6 md:pb-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Dashboard</h1>
-        <Link href="/chat" className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-black">
+        <Link href="/chat" className="tap rounded-lg bg-accent px-4 text-sm font-semibold text-black">
           Open Copilot →
         </Link>
       </div>

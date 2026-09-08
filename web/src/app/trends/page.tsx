@@ -31,15 +31,15 @@ export default function TrendsPage() {
   }
 
   return (
-    <div className="p-6">
-      <div className="mb-4 flex items-center gap-3">
+    <div className="p-4 pb-24 md:p-6 md:pb-6">
+      <div className="mb-4 flex flex-wrap items-center gap-2 md:gap-3">
         <h1 className="text-2xl font-bold">Trend board</h1>
-        <div className="ml-auto flex gap-2">
+        <div className="ml-auto flex flex-wrap gap-2">
           {PLATFORMS.map((p) => (
             <button
               key={p}
               onClick={() => setPlatform(p)}
-              className={`rounded-full px-3 py-1 text-xs capitalize ${
+              className={`tap rounded-full px-4 text-sm capitalize ${
                 platform === p ? "bg-accent text-black font-semibold" : "border border-edge text-slate-400"
               }`}
             >
@@ -49,9 +49,9 @@ export default function TrendsPage() {
           <button
             onClick={refresh}
             disabled={busy}
-            className="rounded-full border border-accent2/40 px-3 py-1 text-xs text-accent2 hover:bg-accent2/10 disabled:opacity-40"
+            className="tap rounded-full border border-accent2/40 px-4 text-sm text-accent2 hover:bg-accent2/10 disabled:opacity-40"
           >
-            {busy ? "refreshing…" : "↻ refresh providers"}
+            {busy ? "refreshing…" : "↻ refresh"}
           </button>
         </div>
       </div>
@@ -69,7 +69,7 @@ export default function TrendsPage() {
               <span className="text-slate-500">{t.kind.replace(/_/g, " ")}</span>
               <span className="ml-auto font-mono text-accent">{t.heat.toFixed(0)}</span>
             </div>
-            <div className="text-sm font-medium text-slate-100">{t.title}</div>
+            <div className="text-[15px] font-medium text-slate-100">{t.title}</div>
             {t.detail && <div className="mt-1 text-xs text-slate-500">{t.detail}</div>}
             <div className="mt-2 h-1 rounded bg-edge">
               <div className="h-1 rounded bg-accent" style={{ width: `${t.heat}%` }} />

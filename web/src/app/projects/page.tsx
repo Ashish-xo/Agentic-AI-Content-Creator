@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api, type Project } from "@/lib/api";
+import { CopyButton } from "@/components/copy-button";
 
 export default function ProjectsPage() {
   const [rows, setRows] = useState<Project[]>([]);
@@ -27,18 +28,18 @@ export default function ProjectsPage() {
   const v = open?.variants as Record<string, Record<string, unknown>> | undefined;
 
   return (
-    <div className="p-6 max-w-5xl">
+    <div className="max-w-5xl p-4 pb-24 md:p-6 md:pb-6">
       <h1 className="mb-1 text-2xl font-bold">Projects</h1>
       <p className="mb-4 text-sm text-slate-500">
         One premise in → per-platform executions out (YouTube long-form, Short, Reel, Note).
       </p>
-      <div className="mb-6 flex gap-2">
+      <div className="mb-6 flex flex-col gap-2 sm:flex-row">
         <input value={premise} onChange={(e) => setPremise(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && create()}
           placeholder="e.g. 15-minute workouts for dads who think they have no time"
-          className="flex-1 rounded-xl border border-edge bg-panel px-4 py-2.5 outline-none focus:border-accent" />
+          className="min-h-[48px] flex-1 rounded-xl border border-edge bg-panel px-4 py-3 outline-none focus:border-accent" />
         <button onClick={create} disabled={busy}
-          className="rounded-xl bg-accent px-5 py-2.5 font-semibold text-black disabled:opacity-40">
+          className="tap w-full rounded-xl bg-accent px-5 font-semibold text-black disabled:opacity-40 sm:w-auto">
           {busy ? "adapting…" : "Make variants"}
         </button>
       </div>
@@ -46,7 +47,7 @@ export default function ProjectsPage() {
       <div className="grid gap-3 md:grid-cols-2">
         {rows.map((p) => (
           <button key={p.id} onClick={() => setOpen(p)}
-            className="rounded-xl border border-edge bg-panel p-4 text-left hover:border-accent/50">
+            className="min-h-[48px] rounded-xl border border-edge bg-panel p-4 text-left hover:border-accent/50">
             <div className="font-semibold text-white">{p.name}</div>
             <div className="mt-1 line-clamp-2 text-sm text-slate-400">{p.premise}</div>
             <div className="mt-2 text-xs text-slate-600">{Object.keys(p.variants || {}).length} platform variants</div>
@@ -56,19 +57,26 @@ export default function ProjectsPage() {
       </div>
 
       {open && v && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6" onClick={() => setOpen(null)}>
-          <div className="max-h-[85vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-edge bg-bg p-6"
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-0 md:items-center md:p-6" onClick={() => setOpen(null)}>
+          <div className="scroll-ios max-h-[85dvh] w-full overflow-y-auto rounded-t-2xl border border-edge bg-bg p-4 md:w-auto md:max-w-3xl md:rounded-2xl md:p-6"
             onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-bold">{open.name}</h2>
-              <button onClick={() => setOpen(null)} className="text-slate-500 hover:text-white">✕</button>
+              <button onClick={() => setOpen(null)} aria-label="Close"
+                className="tap rounded-lg px-3 text-slate-500 hover:text-white">✕</button>
             </div>
-            <div className="space-y-4 text-sm">
+            <div className="space-y-4 pb-6 text-sm">
               {Object.entries(v).map(([plat, body]) => (
-                <div key={plat} className="rounded-xl border border-edge bg-panel p-4">
-                  <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-accent">{plat.replace(/_/g, " ")}</div>
-                  <pre className="whitespace-pre-wrap font-sans text-slate-300">{JSON.stringify(body, null, 2)}</pre>
-                </div>
+                <details key={plat} open={plat === Object.keys(v)[0]}
+                  className="rounded-xl border border-edge bg-panel p-4">
+                  <summary className="tap cursor-pointer list-none text-[11px] font-bold uppercase tracking-wide text-accent">
+                    {plat.replace(/_/g, " ")}
+                  </summary>
+                  <div className="mt-1 mb-2 flex justify-end">
+                    <CopyButton text={JSON.stringify(body, null, 2)} label="Copy" />
+                  </div>
+                  <pre className="mt-2 whitespace-pre-wrap font-sans text-slate-300">{JSON.stringify(body, null, 2)}</pre>
+                </details>
               ))}
             </div>
           </div>

@@ -44,25 +44,25 @@ export default function SettingsPage() {
       <input
         value={(persona?.[key] as string) || ""}
         onChange={(e) => setPersona((p) => (p ? { ...p, [key]: e.target.value } : p))}
-        className="w-full rounded-lg border border-edge bg-panel px-3 py-2 text-sm outline-none focus:border-accent"
+        className="min-h-[48px] w-full rounded-lg border border-edge bg-panel px-3 py-3 text-sm outline-none focus:border-accent"
       />
     </label>
   );
 
   return (
-    <div className="p-6 max-w-3xl space-y-8">
+    <div className="max-w-3xl space-y-8 p-4 pb-24 md:p-6 md:pb-6">
       <h1 className="text-2xl font-bold">Settings</h1>
 
       <section className="rounded-xl border border-edge bg-panel p-5 space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-semibold text-white">Creator persona</h2>
-          <button onClick={reRun} className="text-xs text-accent2 hover:underline">re-run onboarding</button>
+          <button onClick={reRun} className="tap text-sm text-accent2 hover:underline">re-run onboarding</button>
         </div>
         {field("niche", "Niche")}
         {field("target_audience", "Target audience")}
         {field("tone_of_voice", "Tone of voice")}
         {field("content_goal", "Content goal")}
-        <button onClick={save} className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-black">
+        <button onClick={save} className="tap rounded-lg bg-accent px-4 text-sm font-semibold text-black">
           {saved ? "Saved ✓" : "Save persona"}
         </button>
       </section>
