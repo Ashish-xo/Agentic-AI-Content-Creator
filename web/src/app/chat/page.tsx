@@ -112,44 +112,41 @@ export default function ChatPage() {
 
   return (
     <div className="flex h-full flex-col">
-      {/* slim toolbar */}
-      <div className="flex items-center gap-2 border-b border-edge bg-panel px-4 py-2">
-        {MODES.map((m) => (
-          <button
-            key={m.id}
-            onClick={() => setMode(m.id)}
-            className={`rounded-full px-3 py-1 text-xs transition-colors ${
-              mode === m.id ? "bg-accent text-black font-semibold" : "border border-edge text-slate-400 hover:text-white"
-            }`}
-          >
-            {m.label}
-          </button>
-        ))}
-        <span className="mx-1 h-4 w-px bg-edge" />
-        {PLATFORMS.map((p) => (
-          <button
-            key={p.id || "both"}
-            onClick={() => setPlatform(p.id)}
-            title="Which platform's trend data and psychology to write for"
-            className={`rounded-full px-3 py-1 text-xs transition-colors ${
-              platform === p.id ? "bg-accent2 text-black font-semibold" : "border border-edge text-slate-400 hover:text-white"
-            }`}
-          >
-            {p.label}
-          </button>
-        ))}
-        <div className="ml-auto text-xs text-slate-500">
-          {persona?.completed ? `for: ${persona.niche}` : "setup in progress"}
+      {/* toolbar: segmented platform control + scrollable mode chips */}
+      <div className="border-b border-edge bg-panel px-3 py-2">
+        <div role="tablist" aria-label="Platform"
+          className="flex rounded-xl border border-edge bg-bg p-1">
+          {PLATFORMS.map((p) => (
+            <button key={p.id || "both"} role="tab" aria-selected={platform === p.id}
+              onClick={() => setPlatform(p.id)}
+              title="Which platform's trend data and psychology to write for"
+              className={`tap flex-1 rounded-lg text-sm font-medium transition-colors ${
+                platform === p.id ? "bg-accent2 text-black" : "text-slate-400"}`}>
+              {p.label}
+            </button>
+          ))}
+        </div>
+        <div className="scroll-ios mt-2 flex gap-2 overflow-x-auto pb-1">
+          {MODES.map((m) => (
+            <button key={m.id} onClick={() => setMode(m.id)}
+              className={`tap shrink-0 rounded-full px-4 text-sm ${
+                mode === m.id ? "bg-accent text-black font-semibold" : "border border-edge text-slate-400"}`}>
+              {m.label}
+            </button>
+          ))}
+          <span className="tap shrink-0 pl-2 text-[11px] text-slate-500">
+            {persona?.completed ? `for: ${persona.niche}` : "setup…"}
+          </span>
         </div>
       </div>
 
       {/* messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-5">
+      <div className="scroll-ios flex-1 overflow-y-auto px-3 py-4 md:px-4 md:py-5">
         <div className="mx-auto max-w-3xl space-y-4">
           {msgs.map((m, i) => (
             <div key={i} className={m.role === "user" ? "flex justify-end" : "flex justify-start"}>
               <div
-                className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-[15px] ${
+                className={`max-w-[92%] rounded-2xl px-3.5 py-2.5 text-[15px] md:max-w-[85%] ${
                   m.role === "user"
                     ? "bg-accent/15 border border-accent/25 text-slate-100 whitespace-pre-wrap"
                     : "bg-panel border border-edge"
@@ -171,20 +168,20 @@ export default function ChatPage() {
 
       {/* quick-reply chips (onboarding) */}
       {chips.length > 0 && !busy && (
-        <div className="px-4 pb-2">
+        <div className="px-3 pb-2 md:px-4">
           <div className="mx-auto flex max-w-3xl flex-wrap gap-2">
             {chips.map((c) => (
               <button
                 key={c}
                 onClick={() => send(c)}
-                className="rounded-full border border-accent2/40 px-3 py-1 text-xs text-accent2 hover:bg-accent2/10"
+                className="tap rounded-full border border-accent2/40 px-4 text-sm text-accent2 active:bg-accent2/10"
               >
                 {c}
               </button>
             ))}
             <button
               onClick={() => send("skip")}
-              className="rounded-full border border-edge px-3 py-1 text-xs text-slate-500 hover:text-white"
+              className="tap rounded-full border border-edge px-4 text-sm text-slate-500 active:text-white"
             >
               skip
             </button>
@@ -192,8 +189,8 @@ export default function ChatPage() {
         </div>
       )}
 
-      {/* composer */}
-      <div className="border-t border-edge bg-panel px-4 py-3">
+      {/* composer (main's pb already clears the bottom nav + safe area) */}
+      <div className="border-t border-edge bg-panel px-3 py-2 md:px-4 md:py-3">
         <form
           className="mx-auto flex max-w-3xl gap-2"
           onSubmit={(e) => {
@@ -205,13 +202,13 @@ export default function ChatPage() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder={persona?.completed ? "Ask anything — or pick a mode above" : "Answer the question above, or type skip"}
-            className="flex-1 rounded-xl border border-edge bg-bg px-4 py-3 text-[15px] outline-none placeholder:text-slate-600 focus:border-accent"
+            className="min-h-[48px] flex-1 rounded-xl border border-edge bg-bg px-4 text-[15px] outline-none placeholder:text-slate-600 focus:border-accent"
             disabled={busy}
           />
           <button
             type="submit"
             disabled={busy || !input.trim()}
-            className="rounded-xl bg-accent px-5 py-3 font-semibold text-black disabled:opacity-40"
+            className="tap rounded-xl bg-accent px-5 font-semibold text-black disabled:opacity-40"
           >
             {busy ? "…" : "Send"}
           </button>
