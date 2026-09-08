@@ -1,11 +1,13 @@
 "use client";
 
+import { authHeadersAsync } from "./auth";
+
 const BASE = "/api";
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const r = await fetch(`${BASE}${path}`, {
-    headers: { "Content-Type": "application/json" },
     ...init,
+    headers: { "Content-Type": "application/json", ...(await authHeadersAsync()), ...(init?.headers as Record<string, string> | undefined) },
   });
   if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
   return r.json() as Promise<T>;
@@ -25,11 +27,12 @@ export async function chatStream(
   mode: string | null,
   history: { role: string; content: string }[],
   onEvent: (e: Record<string, unknown>) => void,
+  platform: string | null = null,
 ): Promise<void> {
   const r = await fetch(`${BASE}/chat/stream`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message, mode, history }),
+    headers: { "Content-Type": "application/json", ...(await authHeadersAsync()) },
+    body: JSON.stringify({ message, mode, history, platform }),
   });
   if (!r.ok || !r.body) throw new Error(`chat ${r.status}`);
   const reader = r.body.getReader();

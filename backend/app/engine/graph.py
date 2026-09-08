@@ -58,9 +58,10 @@ async def run_turn(
     history: list[dict[str, str]],
     persona: Persona | None,
     mode: str | None,
+    platform: str | None = None,
 ) -> tuple[str, list[Any]]:
     """Non-streaming turn. Returns (answer, trend rows used)."""
-    platform = _pick_platform(user_text)
+    platform = platform or _pick_platform(user_text)
     rows = trends.query_trends(db, platform=platform, niche=persona.niche if persona else None)
     books = rag.retrieve(db, platform, user_text)
     msgs = build_messages(user_text, history, persona, mode, rows, rag.context_block(books))
@@ -79,9 +80,10 @@ async def stream_turn(
     history: list[dict[str, str]],
     persona: Persona | None,
     mode: str | None,
+    platform: str | None = None,
 ) -> AsyncIterator[dict[str, Any]]:
     """Streaming turn. Yields events: {type: meta|trend|delta|done}."""
-    platform = _pick_platform(user_text)
+    platform = platform or _pick_platform(user_text)
     rows = trends.query_trends(db, platform=platform, niche=persona.niche if persona else None)
     books = rag.retrieve(db, platform, user_text)
     msgs = build_messages(user_text, history, persona, mode, rows, rag.context_block(books))

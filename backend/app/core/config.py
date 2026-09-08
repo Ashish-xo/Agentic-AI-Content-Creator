@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     youtube_api_key: str = ""
     apify_token: str = ""
     serpapi_key: str = ""
+    trends_geo: str = "US"  # Google Trends RSS region
 
     cors_origins: str = "http://localhost:3000"
 

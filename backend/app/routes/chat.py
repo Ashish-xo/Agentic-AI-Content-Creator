@@ -20,6 +20,7 @@ router = APIRouter(prefix="/api/chat", tags=["chat"])
 class ChatIn(BaseModel):
     message: str
     mode: str | None = None  # research|creation|optimization|auto|None
+    platform: str | None = None  # youtube|instagram|None (UI toggle; else auto-detect)
     history: list[dict[str, str]] = []
 
 
@@ -66,13 +67,14 @@ async def chat_stream(
 
         # --- normal copilot turn ---
         mode = _resolve_mode(body.mode, body.message)
+        platform = body.platform if body.platform in ("youtube", "instagram") else None
         history = [{"role": h.get("role", "user"), "content": h.get("content", "")[:4000]}
                    for h in body.history[-8:] if h.get("content")]
         db.add(ChatMessage(user_id=user_id, role="user", content=body.message, mode=mode))
         db.commit()
         collected: list[str] = []
         try:
-            async for ev in graph.stream_turn(db, body.message, history, persona, mode):
+            async for ev in graph.stream_turn(db, body.message, history, persona, mode, platform):
                 if ev["type"] == "delta":
                     collected.append(ev["text"])
                 yield sse(ev)
@@ -103,7 +105,8 @@ async def chat_once(
     mode = _resolve_mode(body.mode, body.message)
     history = [{"role": h.get("role", "user"), "content": h.get("content", "")[:4000]}
                for h in body.history[-8:] if h.get("content")]
-    answer, rows = await graph.run_turn(db, body.message, history, persona, mode)
+    answer, rows = await graph.run_turn(db, body.message, history, persona, mode,
+                                        body.platform if body.platform in ("youtube", "instagram") else None)
     return {"answer": answer, "mode": mode,
             "trends_used": [{"platform": r.platform, "title": r.title, "heat": r.heat} for r in rows[:5]]}
 

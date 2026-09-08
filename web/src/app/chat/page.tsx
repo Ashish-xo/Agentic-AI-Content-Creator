@@ -14,10 +14,17 @@ const MODES = [
   { id: "optimization", label: "📈 Optimization" },
 ];
 
+const PLATFORMS = [
+  { id: "", label: "Both" },
+  { id: "youtube", label: "▶ YouTube" },
+  { id: "instagram", label: "📸 Instagram" },
+];
+
 export default function ChatPage() {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [mode, setMode] = useState<string>("auto");
+  const [platform, setPlatform] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const [persona, setPersona] = useState<Persona | null>(null);
   const [chips, setChips] = useState<string[]>([]);
@@ -94,7 +101,7 @@ export default function ChatPage() {
         } else if (e.type === "error") {
           acc += `\n\n_(error: ${e.detail})_`;
         }
-      });
+      }, platform || null);
     } catch (err) {
       setMsgs((m) => [...m, { role: "assistant", content: `Something broke: ${String(err)}` }]);
     } finally {
@@ -116,6 +123,19 @@ export default function ChatPage() {
             }`}
           >
             {m.label}
+          </button>
+        ))}
+        <span className="mx-1 h-4 w-px bg-edge" />
+        {PLATFORMS.map((p) => (
+          <button
+            key={p.id || "both"}
+            onClick={() => setPlatform(p.id)}
+            title="Which platform's trend data and psychology to write for"
+            className={`rounded-full px-3 py-1 text-xs transition-colors ${
+              platform === p.id ? "bg-accent2 text-black font-semibold" : "border border-edge text-slate-400 hover:text-white"
+            }`}
+          >
+            {p.label}
           </button>
         ))}
         <div className="ml-auto text-xs text-slate-500">

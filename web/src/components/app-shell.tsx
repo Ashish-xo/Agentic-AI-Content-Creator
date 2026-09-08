@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { AuthWidget } from "@/components/auth-widget";
+import { CLERK_ON } from "@/components/auth-provider";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: "▦" },
@@ -39,6 +41,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </Link>
           ))}
         </nav>
+        <AuthWidget enabled={CLERK_ON} />
         <div className="px-4 py-3 text-[11px] text-slate-500">
           brain: qwen3.8-flash · b.ai
         </div>

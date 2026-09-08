@@ -104,9 +104,52 @@ async def refresh_serpapi(db: Session) -> int:
     return n
 
 
+async def refresh_google_trends(db: Session) -> int:
+    """Google Trends 'trending now' RSS — free, no key. Cross-platform signals.
+
+    This is the default live source; YouTube API / Apify / SerpAPI layer on
+    top when their keys exist.
+    """
+    import re
+    from xml.etree import ElementTree
+
+    url = "https://trends.google.com/trending/rss"
+    geo = get_settings().trends_geo
+    headers = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36"}
+    async with httpx.AsyncClient(timeout=30, follow_redirects=True, headers=headers) as client:
+        r = await client.get(url, params={"geo": geo})
+        r.raise_for_status()
+    ns = {"ht": "https://trends.google.com/trending/rss"}
+    root = ElementTree.fromstring(re.sub(r"[\x00-\x08]", "", r.text))
+    n = 0
+    for item in root.iter("item"):
+        q = (item.findtext("title") or "").strip()[:200]
+        traffic = (item.findtext("ht:approx_traffic", default="", namespaces=ns) or "").strip()
+        if not q:
+            continue
+        num = int(re.sub(r"[^\d]", "", traffic) or 0)
+        heat = min(95.0, 55 + num / 1_000_000 * 40)  # 1M+ searches -> ~95
+        exists = (
+            db.query(TrendSignal)
+            .filter(TrendSignal.source == "google_trends", TrendSignal.title == q)
+            .first()
+        )
+        if exists:
+            exists.heat = max(exists.heat, heat)
+            continue
+        db.add(TrendSignal(platform="cross", kind="search_query", title=q,
+                           detail=f"traffic: {traffic} ({geo})", heat=heat,
+                           source="google_trends"))
+        n += 1
+    db.commit()
+    return n
+
+
 async def refresh_all(db: Session) -> dict[str, int]:
     out = {}
-    for name, fn in (("youtube_api", refresh_youtube), ("apify", refresh_apify), ("serpapi", refresh_serpapi)):
+    for name, fn in (("google_trends", refresh_google_trends),
+                     ("youtube_api", refresh_youtube), ("apify", refresh_apify),
+                     ("serpapi", refresh_serpapi)):
         try:
             out[name] = await fn(db)
         except Exception as e:  # provider down must never break the app
