@@ -27,3 +27,17 @@ body {
 .md-body table { border-collapse: collapse; margin: 0.6em 0; font-size: 0.9em; }
 .md-body th, .md-body td { border: 1px solid #1f2530; padding: 0.35em 0.7em; }
 .md-body hr { border-color: #1f2530; margin: 0.9em 0; }
+
+/* ---- mobile polish ---- */
+html { -webkit-text-size-adjust: 100%; }
+button, a, [role="button"] {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation; /* removes 300ms dblclick delay */
+}
+/* 48px minimum tap target utility (spec requirement) */
+.tap { min-height: 48px; min-width: 48px; display: inline-flex; align-items: center; justify-content: center; }
+/* safe areas: bottom nav + composer sit above iOS home bar */
+.pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+.pt-safe { padding-top: env(safe-area-inset-top); }
+/* momentum scroll on iOS for inner scroll containers */
+.scroll-ios { -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
