@@ -2,10 +2,11 @@
 from __future__ import annotations
 
 import json
+import logging
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.auth import current_user
@@ -14,14 +15,16 @@ from app.engine import cringe, graph, modes, onboarding
 from app.models.tables import ChatMessage
 from app.services.ratelimit import chat_limit
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 
 class ChatIn(BaseModel):
-    message: str
+    message: str = Field(min_length=1, max_length=8000)
     mode: str | None = None  # research|creation|optimization|auto|None
     platform: str | None = None  # youtube|instagram|None (UI toggle; else auto-detect)
-    history: list[dict[str, str]] = []
+    history: list[dict[str, str]] = Field(default_factory=list, max_length=20)
 
 
 def _resolve_mode(mode: str | None, message: str) -> str | None:
@@ -79,7 +82,8 @@ async def chat_stream(
                     collected.append(ev["text"])
                 yield sse(ev)
         except Exception as e:
-            yield sse({"type": "error", "detail": str(e)[:300]})
+            logger.exception("chat stream failed")
+            yield sse({"type": "error", "detail": "The model endpoint had a hiccup — try again."})
             collected.append("(the model endpoint had a hiccup — try again)")
         answer = "".join(collected)
         if answer:

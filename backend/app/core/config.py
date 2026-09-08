@@ -18,6 +18,7 @@ class Settings(BaseSettings):
 
     # Auth — Clerk
     clerk_secret_key: str = ""
+    clerk_issuer: str = ""  # optional exact expected iss (custom domain); empty = Clerk-domain allowlist
     # Billing — Stripe
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""

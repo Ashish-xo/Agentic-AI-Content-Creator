@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
@@ -35,25 +35,25 @@ async def refresh_trends(user_id: str = Depends(current_user), db: Session = Dep
 
 # ---------- generation ----------
 class HookIn(BaseModel):
-    topic: str
+    topic: str = Field(min_length=1, max_length=2000)
     platform: str = "youtube"
-    count: int = 3
+    count: int = Field(default=3, ge=1, le=10)
 
 
 class ScriptIn(BaseModel):
-    topic: str
+    topic: str = Field(min_length=1, max_length=2000)
     platform: str = "youtube"
-    seconds: int = 30
+    seconds: int = Field(default=30, ge=5, le=600)
 
 
 class CritiqueIn(BaseModel):
-    draft: str
+    draft: str = Field(min_length=1, max_length=20000)
     platform: str = "instagram"
 
 
 class VariantIn(BaseModel):
-    premise: str
-    project_name: str | None = None
+    premise: str = Field(min_length=1, max_length=4000)
+    project_name: str | None = Field(default=None, max_length=200)
 
 
 @router.post("/api/generate/hooks")
@@ -138,10 +138,10 @@ def get_project(project_id: int, user_id: str = Depends(current_user),
 
 # ---------- persona ----------
 class PersonaIn(BaseModel):
-    niche: str | None = None
-    target_audience: str | None = None
-    tone_of_voice: str | None = None
-    content_goal: str | None = None
+    niche: str | None = Field(default=None, max_length=500)
+    target_audience: str | None = Field(default=None, max_length=500)
+    tone_of_voice: str | None = Field(default=None, max_length=500)
+    content_goal: str | None = Field(default=None, max_length=500)
 
 
 @router.get("/api/persona")

@@ -55,5 +55,9 @@ http_limit = Limiter(120)
 
 
 async def guard_http(request: Request) -> None:
-    user = request.headers.get("x-user-id", "anon")
-    await http_limit.check(f"http:{user}")
+    # Key on client IP, not a spoofable header. Behind a reverse proxy,
+    # X-Forwarded-For's leftmost hop is the client (uvicorn --proxy-headers
+    # also normalizes request.client.host).
+    fwd = request.headers.get("x-forwarded-for", "")
+    ip = fwd.split(",")[0].strip() if fwd else (request.client.host if request.client else "unknown")
+    await http_limit.check(f"http:{ip}")

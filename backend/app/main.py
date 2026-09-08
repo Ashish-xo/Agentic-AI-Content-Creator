@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
@@ -30,20 +30,32 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     s = get_settings()
-    app = FastAPI(title="Content Copilot API", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title="Content Copilot API", version="0.1.0", lifespan=lifespan,
+                  docs_url=None if s.environment == "production" else "/docs",
+                  redoc_url=None, openapi_url=None if s.environment == "production" else "/openapi.json")
     app.add_middleware(
         CORSMiddleware,
         allow_origins=s.cors_origin_list,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type"],
     )
 
     @app.middleware("http")
-    async def rate_guard(request: Request, call_next):
+    async def security_headers(request: Request, call_next):
+        from fastapi.responses import JSONResponse
         if request.url.path.startswith("/api"):
-            await guard_http(request)
-        return await call_next(request)
+            try:
+                await guard_http(request)
+            except HTTPException as e:
+                return JSONResponse({"detail": e.detail}, status_code=e.status_code)
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'"
+        return response
 
     @app.get("/api/health")
     async def health():
