@@ -92,6 +92,10 @@ async def stream_turn(
            "trends_used": [
                {"platform": r.platform, "kind": r.kind, "title": r.title, "heat": r.heat}
                for r in rows[:5]
+           ],
+           "playbooks_used": [
+               {"id": b.id, "topic": b.topic, "platform": b.platform}
+               for b in books
            ]}
     temp = modes.TEMPS.get(mode or "", 0.6)
     budget = modes.BUDGETS.get(mode or "", 2048)
