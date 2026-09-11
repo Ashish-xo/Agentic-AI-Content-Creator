@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.db.session import Base, SessionLocal, engine
-from app.engine import embed_bridge, fewshot
+from app.engine import embed_bridge, fewshot, rag
 from app.engine.fewshot import seed_examples
 from app.models.tables import HookExample, Playbook
 from app.routes import chat, core
@@ -26,6 +26,21 @@ def _index_vectors(db) -> None:
             print(f"[embed] indexed {n1} playbooks + {n2} hook examples")
     except Exception as e:
         print(f"[embed] indexing skipped: {e} (lexical RAG still active)")
+    # HNSW cosine indexes so vector search stays sub-ms as the KB grows
+    # (idempotent; no-op on SQLite / when pgvector ext is absent)
+    try:
+        from sqlalchemy import text as sql_text
+        if rag._pgvector_ready(db):
+            db.execute(sql_text(
+                "CREATE INDEX IF NOT EXISTS playbooks_embedding_hnsw "
+                "ON playbooks USING hnsw (embedding vector_cosine_ops)"))
+            db.execute(sql_text(
+                "CREATE INDEX IF NOT EXISTS hook_examples_embedding_hnsw "
+                "ON hook_examples USING hnsw (embedding vector_cosine_ops)"))
+            db.commit()
+            print("[embed] HNSW cosine indexes ensured")
+    except Exception as e:
+        print(f"[embed] HNSW index skipped: {e}")
 
 
 @asynccontextmanager
