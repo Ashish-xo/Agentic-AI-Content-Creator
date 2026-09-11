@@ -7,6 +7,12 @@ from typing import Any
 from sqlalchemy import JSON, Boolean, DateTime, Float, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
+try:
+    from pgvector.sqlalchemy import Vector
+    _EMBEDDING_COL = Vector(384)
+except ImportError:  # pgvector python pkg absent -> embedding column degrades to JSON
+    _EMBEDDING_COL = JSON
+
 from app.db.session import Base
 
 
@@ -63,6 +69,7 @@ class Playbook(Base):
     topic: Mapped[str] = mapped_column(String(128))
     body: Mapped[str] = mapped_column(Text)
     keywords: Mapped[list[str]] = mapped_column(JSON, default=list)
+    embedding: Mapped[list[float] | None] = mapped_column(_EMBEDDING_COL)
 
 
 class GeneratedItem(Base):
@@ -130,3 +137,4 @@ class HookExample(Base):
     hook: Mapped[str] = mapped_column(Text)
     archetype: Mapped[str] = mapped_column(String(64))
     metric: Mapped[str | None] = mapped_column(Text)  # why it performed
+    embedding: Mapped[list[float] | None] = mapped_column(_EMBEDDING_COL)

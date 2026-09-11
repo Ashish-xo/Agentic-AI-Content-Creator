@@ -8,11 +8,24 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.db.session import Base, SessionLocal, engine
-from app.engine import fewshot
+from app.engine import embed_bridge, fewshot
+from app.engine.fewshot import seed_examples
+from app.models.tables import HookExample, Playbook
 from app.routes import chat, core
 from app.seed.data import seed
 from app.services import automation
 from app.services.ratelimit import guard_http
+
+
+def _index_vectors(db) -> None:
+    """Attach local embeddings to seed knowledge (idempotent, non-fatal)."""
+    try:
+        n1 = embed_bridge.index_playbooks(db, db.query(Playbook).all())
+        n2 = embed_bridge.index_hook_examples(db, db.query(HookExample).all())
+        if n1 or n2:
+            print(f"[embed] indexed {n1} playbooks + {n2} hook examples")
+    except Exception as e:
+        print(f"[embed] indexing skipped: {e} (lexical RAG still active)")
 
 
 @asynccontextmanager
@@ -21,7 +34,8 @@ async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
         seed(db)
-        fewshot.seed_examples(db)
+        seed_examples(db)
+        _index_vectors(db)
     finally:
         db.close()
     automation.start(SessionLocal)

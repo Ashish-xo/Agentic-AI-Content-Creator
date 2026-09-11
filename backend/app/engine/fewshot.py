@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
+from app.engine import embed_bridge
 from app.engine.rag import _tokens
 from app.models.tables import HookExample
 
@@ -47,9 +48,22 @@ def seed_examples(db: Session) -> None:
 
 
 def select_examples(db: Session, platform: str | None, topic: str, k: int = 4) -> list[HookExample]:
-    """Lexical few-shot selection: platform match first, then topic overlap."""
-    q = db.query(HookExample)
-    rows = q.all()
+    """Vector-first few-shot selection; lexical fallback (platform + topic overlap)."""
+    rows = db.query(HookExample).all()
+    qvec = embed_bridge.embedding(topic)
+    if qvec is not None and rows and all(r.embedding is not None for r in rows):
+        emb_map = {r.id: list(r.embedding) for r in rows}  # type: ignore[arg-type]
+        try:
+            # cosine sim (vectors are normalized) + small same-platform bonus
+            scored = [
+                (sum(a * b for a, b in zip(qvec, emb_map[r.id]))
+                 + (0.1 if platform and r.platform == platform else 0), r)
+                for r in rows
+            ]
+            scored.sort(key=lambda x: -x[0])
+            return [r for _, r in scored[:k]]
+        except Exception:
+            pass
     tt = _tokens(topic)
     scored = []
     for e in rows:
@@ -57,8 +71,7 @@ def select_examples(db: Session, platform: str | None, topic: str, k: int = 4) -
         overlap = len(tt & _tokens(e.hook + " " + e.archetype))
         scored.append((plat_bonus + overlap * 2, e))
     scored.sort(key=lambda x: -x[0])
-    picked = [e for _, e in scored[:k]]
-    return picked or [e for _, e in scored[:k]]
+    return [e for _, e in scored[:k]]
 
 
 def fewshot_block(examples: list[HookExample], topic: str, count: int) -> str:
