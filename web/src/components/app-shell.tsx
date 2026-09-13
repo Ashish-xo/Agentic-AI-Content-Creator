@@ -51,7 +51,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Link
               key={n.href}
               href={n.href}
-              className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
+              className={`tap !justify-start flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
                 pathname.startsWith(n.href)
                   ? "bg-edge text-white"
                   : "text-slate-400 hover:text-white hover:bg-edge/50"

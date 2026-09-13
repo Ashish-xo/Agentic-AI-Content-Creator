@@ -62,8 +62,10 @@ async def stream(
     model: str | None = None,
     temperature: float = 0.7,
     max_tokens: int = 2048,
+    out_meta: dict[str, Any] | None = None,
 ) -> AsyncIterator[str]:
-    """Yield text deltas. Only `content` deltas — reasoning is dropped."""
+    """Yield text deltas. Only `content` deltas — reasoning is dropped.
+    If out_meta is given, records finish_reason so callers can detect truncation."""
     payload = {
         "model": model or get_settings().llm_model,
         "messages": messages,
@@ -89,6 +91,8 @@ async def stream(
                 choices = obj.get("choices") or []
                 if not choices:
                     continue
+                if out_meta is not None and choices[0].get("finish_reason"):
+                    out_meta["finish_reason"] = choices[0]["finish_reason"]
                 delta = choices[0].get("delta", {}) or {}
                 text = delta.get("content")
                 if text:

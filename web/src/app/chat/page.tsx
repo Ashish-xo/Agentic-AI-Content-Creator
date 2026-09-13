@@ -104,6 +104,8 @@ export default function ChatPage() {
               return copy;
             });
           }
+        } else if (e.type === "truncated") {
+          acc += `\n\n_✂️ Hit the ${e.budget}-token output cap — say "continue" for the rest._`;
         } else if (e.type === "error") {
           acc += `\n\n_(error: ${e.detail})_`;
         }

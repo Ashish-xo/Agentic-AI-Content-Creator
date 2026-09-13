@@ -100,9 +100,12 @@ async def stream_turn(
     temp = modes.TEMPS.get(mode or "", 0.6)
     budget = modes.BUDGETS.get(mode or "", 2048)
     collected: list[str] = []
-    async for delta in llm.stream(msgs, temperature=temp, max_tokens=budget):
+    meta: dict[str, Any] = {}
+    async for delta in llm.stream(msgs, temperature=temp, max_tokens=budget, out_meta=meta):
         collected.append(delta)
         yield {"type": "delta", "text": delta}
+    if meta.get("finish_reason") == "length":
+        yield {"type": "truncated", "budget": budget}
     # post-processing gate: scan the full answer after streaming completes
     violations = cringe.scan("".join(collected))
     if violations:
