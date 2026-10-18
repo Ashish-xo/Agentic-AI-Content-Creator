@@ -11,7 +11,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.engine import cringe, modes, rag
+from app.engine import cringe, fewshot, modes, rag
 from app.engine.onboarding import LABELS, FIELDS  # noqa: F401  (re-export for routes)
 from app.models.tables import Persona
 from app.services import llm, trends
@@ -32,6 +32,7 @@ def build_messages(
     mode: str | None,
     trend_rows: list[Any],
     playbook_ctx: str,
+    hook_ctx: str = "",
 ) -> list[dict[str, str]]:
     system = [SYSTEM_BASE]
     if persona and persona.completed:
@@ -40,6 +41,8 @@ def build_messages(
         system.append(modes.RUBRICS[mode])
     if playbook_ctx:
         system.append(playbook_ctx)
+    if hook_ctx:
+        system.append(hook_ctx)
     if trend_rows:
         lines = "\n".join(
             f"- [{r.platform}/{r.kind}] {r.title} (heat {r.heat:.0f})"
@@ -64,7 +67,9 @@ async def run_turn(
     platform = platform or _pick_platform(user_text)
     rows = trends.query_trends(db, platform=platform, niche=persona.niche if persona else None)
     books = rag.retrieve(db, platform, user_text)
-    msgs = build_messages(user_text, history, persona, mode, rows, rag.context_block(books))
+    hook_ex = fewshot.select_examples(db, platform, user_text, k=3)
+    msgs = build_messages(user_text, history, persona, mode, rows,
+                          rag.context_block(books), fewshot.chat_examples_block(hook_ex))
     temp = modes.TEMPS.get(mode or "", 0.6)
     budget = modes.BUDGETS.get(mode or "", 2048)
     answer = await llm.complete(msgs, temperature=temp, max_tokens=budget)
@@ -86,9 +91,11 @@ async def stream_turn(
     platform = platform or _pick_platform(user_text)
     rows = trends.query_trends(db, platform=platform, niche=persona.niche if persona else None)
     books = rag.retrieve(db, platform, user_text)
-    msgs = build_messages(user_text, history, persona, mode, rows, rag.context_block(books))
+    hook_ex = fewshot.select_examples(db, platform, user_text, k=3)
+    msgs = build_messages(user_text, history, persona, mode, rows,
+                          rag.context_block(books), fewshot.chat_examples_block(hook_ex))
     yield {"type": "meta", "mode": mode, "platform": platform,
-           "tools": ["trend_lookup", "rag_retrieve"],
+           "tools": ["trend_lookup", "rag_retrieve", "hook_rag"],
            "trends_used": [
                {"platform": r.platform, "kind": r.kind, "title": r.title, "heat": r.heat}
                for r in rows[:5]
@@ -96,6 +103,10 @@ async def stream_turn(
            "playbooks_used": [
                {"id": b.id, "topic": b.topic, "platform": b.platform}
                for b in books
+           ],
+           "hooks_used": [
+               {"id": e.id, "hook": e.hook, "archetype": e.archetype}
+               for e in hook_ex
            ]}
     temp = modes.TEMPS.get(mode or "", 0.6)
     budget = modes.BUDGETS.get(mode or "", 2048)

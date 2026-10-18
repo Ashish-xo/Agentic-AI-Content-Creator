@@ -74,6 +74,18 @@ def select_examples(db: Session, platform: str | None, topic: str, k: int = 4) -
     return [e for _, e in scored[:k]]
 
 
+def chat_examples_block(examples: list[HookExample]) -> str:
+    """Chat-path injection: retrieved hook patterns as style references (not a
+    generation task — the copilot may be answering any question)."""
+    if not examples:
+        return ""
+    lines = "\n".join(f'- "{e.hook}" ({e.archetype}; {e.metric})' for e in examples)
+    return (
+        "High-performing hook patterns relevant to this request "
+        "(style references when you suggest hooks or openings):\n" + lines
+    )
+
+
 def fewshot_block(examples: list[HookExample], topic: str, count: int) -> str:
     """The analyze-then-generate prompt structure."""
     lines = "\n".join(
