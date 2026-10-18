@@ -5,7 +5,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { api, chatStream, type Persona } from "@/lib/api";
 
-type UsedContext = { trends: { title: string; platform: string; heat: number }[]; playbooks: { topic: string; platform: string }[] };
+type UsedContext = { trends: { title: string; platform: string; heat: number }[]; playbooks: { topic: string; platform: string }[]; hooks: { hook: string; archetype: string }[] };
 type Msg = { role: "user" | "assistant"; content: string; mode?: string | null; streaming?: boolean; context?: UsedContext };
 
 const MODES = [
@@ -70,7 +70,7 @@ export default function ChatPage() {
     setMsgs((m) => [...m, { role: "user", content: trimmed }]);
     const history = msgs.slice(-8).map(({ role, content }) => ({ role, content }));
     let acc = "";
-    let ctx: UsedContext = { trends: [], playbooks: [] };
+    let ctx: UsedContext = { trends: [], playbooks: [], hooks: [] };
     try {
       await chatStream(trimmed, mode === "auto" ? null : mode, history, (e) => {
         if (e.type === "delta") {
@@ -90,6 +90,7 @@ export default function ChatPage() {
           ctx = {
             trends: ((e.trends_used as UsedContext["trends"]) || []).slice(0, 5),
             playbooks: (e.playbooks_used as UsedContext["playbooks"]) || [],
+            hooks: (e.hooks_used as UsedContext["hooks"]) || [],
           };
         } else if (e.type === "onboarding") {
           loadPersona();
@@ -167,15 +168,19 @@ export default function ChatPage() {
                 ) : (
                   m.content
                 )}
-                {m.role === "assistant" && m.context && (m.context.playbooks.length > 0 || m.context.trends.length > 0) && !m.streaming && (
+                {m.role === "assistant" && m.context && (m.context.playbooks.length > 0 || m.context.trends.length > 0 || m.context.hooks?.length > 0) && !m.streaming && (
                   <details className="mt-2 border-t border-edge pt-1.5 text-[11px] text-slate-500">
                     <summary className="cursor-pointer select-none list-none">
                       📚 {m.context.playbooks.length} playbook{m.context.playbooks.length === 1 ? "" : "s"}
+                      {m.context.hooks?.length ? ` · ${m.context.hooks.length} hook pattern${m.context.hooks.length === 1 ? "" : "s"}` : ""}
                       {m.context.trends.length ? ` · ${m.context.trends.length} trend${m.context.trends.length === 1 ? "" : "s"} used` : " used"}
                     </summary>
                     <ul className="mt-1 space-y-0.5">
                       {m.context.playbooks.map((p, j) => (
                         <li key={`p${j}`}>▸ <span className="text-accent2">{p.platform}</span> — {p.topic}</li>
+                      ))}
+                      {m.context.hooks?.map((h, j) => (
+                        <li key={`h${j}`}>🪝 <span className="text-accent2">{h.archetype}</span> — “{h.hook}”</li>
                       ))}
                       {m.context.trends.map((t, j) => (
                         <li key={`t${j}`}>▲ <span className="text-accent2">{t.platform}</span> — {t.title} <span className="text-slate-600">(heat {t.heat})</span></li>
