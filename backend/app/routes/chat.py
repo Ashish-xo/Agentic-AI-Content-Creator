@@ -25,6 +25,17 @@ class ChatIn(BaseModel):
     mode: str | None = None  # research|creation|optimization|auto|None
     platform: str | None = None  # youtube|instagram|None (UI toggle; else auto-detect)
     history: list[dict[str, str]] = Field(default_factory=list, max_length=20)
+    compact: bool = False  # mobile: slimmer meta events + tighter history cap
+
+
+def _trim_history(history: list[dict[str, str]], compact: bool = False) -> list[dict[str, str]]:
+    """Last 8 messages, each capped (4000 chars, 1500 in compact/mobile mode)."""
+    cap = 1500 if compact else 4000
+    return [
+        {"role": h.get("role", "user"), "content": h.get("content", "")[:cap]}
+        for h in history[-8:]
+        if h.get("content")
+    ]
 
 
 def _resolve_mode(mode: str | None, message: str) -> str | None:
@@ -71,13 +82,13 @@ async def chat_stream(
         # --- normal copilot turn ---
         mode = _resolve_mode(body.mode, body.message)
         platform = body.platform if body.platform in ("youtube", "instagram") else None
-        history = [{"role": h.get("role", "user"), "content": h.get("content", "")[:4000]}
-                   for h in body.history[-8:] if h.get("content")]
+        history = _trim_history(body.history, body.compact)
         db.add(ChatMessage(user_id=user_id, role="user", content=body.message, mode=mode))
         db.commit()
         collected: list[str] = []
         try:
-            async for ev in graph.stream_turn(db, body.message, history, persona, mode, platform):
+            async for ev in graph.stream_turn(db, body.message, history, persona, mode, platform,
+                                              compact=body.compact):
                 if ev["type"] == "delta":
                     collected.append(ev["text"])
                 yield sse(ev)
@@ -107,8 +118,7 @@ async def chat_once(
         nxt, done = await onboarding.handle_answer(db, user_id, body.message)
         return {"answer": ("Persona saved." if done else nxt), "onboarding": True, "done": done}
     mode = _resolve_mode(body.mode, body.message)
-    history = [{"role": h.get("role", "user"), "content": h.get("content", "")[:4000]}
-               for h in body.history[-8:] if h.get("content")]
+    history = _trim_history(body.history, body.compact)
     answer, rows = await graph.run_turn(db, body.message, history, persona, mode,
                                         body.platform if body.platform in ("youtube", "instagram") else None)
     return {"answer": answer, "mode": mode,

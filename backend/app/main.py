@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 
 from app.core.config import get_settings
 from app.db.session import Base, SessionLocal, engine
@@ -69,6 +70,9 @@ def create_app() -> FastAPI:
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type"],
     )
+    # GZip JSON responses (trend lists/library shrink ~70% on 4G). SSE is left
+    # raw on purpose — gzip middleware buffering would kill streaming smoothness.
+    app.add_middleware(GZipMiddleware, minimum_size=864)
 
     @app.middleware("http")
     async def security_headers(request: Request, call_next):

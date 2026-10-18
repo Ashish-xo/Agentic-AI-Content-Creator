@@ -78,6 +78,10 @@ async def stream(
             "POST", f"{_url()}/chat/completions", headers=_headers(), json=payload
         ) as resp:
             resp.raise_for_status()
+            # Mobile-tuned transport batching: accumulate token deltas and emit
+            # ~80-char chunks. Fewer, larger SSE frames = less per-frame overhead
+            # on lossy 4G (product budgets are unaffected — this is transport-only).
+            buf = ""
             async for line in resp.aiter_lines():
                 if not line.startswith("data:"):
                     continue
@@ -96,7 +100,12 @@ async def stream(
                 delta = choices[0].get("delta", {}) or {}
                 text = delta.get("content")
                 if text:
-                    yield text
+                    buf += text
+                    if len(buf) >= 80:
+                        yield buf
+                        buf = ""
+            if buf:
+                yield buf
 
 
 _FENCE = re.compile(r"```(?:json)?\s*(.*?)```", re.DOTALL)

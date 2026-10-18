@@ -72,3 +72,16 @@ def test_fewshot_selection_and_block(db_session):
     block = fewshot.fewshot_block(picked, "home workouts", 5)
     assert block.startswith("Analyze how these high-retention hooks work:")
     assert "Now generate 5 hooks for: home workouts" in block
+
+
+def test_history_trim():
+    from app.routes.chat import _trim_history
+    hist = [{"role": "user", "content": "y" * 9999} for _ in range(10)]
+    trimmed = _trim_history(hist)
+    assert len(trimmed) == 8  # last 8 kept
+    assert all(len(m["content"]) == 4000 for m in trimmed)
+    compact = _trim_history(hist, compact=True)
+    assert all(len(m["content"]) == 1500 for m in compact)
+    # messages without content are dropped
+    mixed = [{"role": "user", "content": "hi"}, {"role": "assistant"}, {"role": "user", "content": "yo"}]
+    assert len(_trim_history(mixed)) == 2

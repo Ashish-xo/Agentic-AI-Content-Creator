@@ -21,7 +21,10 @@ export const api = {
     req<T>(p, { method: "PUT", body: body ? JSON.stringify(body) : undefined }),
 };
 
-/** Stream SSE chat; onEvent per parsed event. */
+/** Stream SSE chat; onEvent per parsed event.
+ * Deltas are coalesced: consecutive deltas merge and render at most once per
+ * animation frame (16ms) — kills per-token React re-render jank on phones.
+ * Non-delta events (meta/done/error/filter) flush immediately, order preserved. */
 export async function chatStream(
   message: string,
   mode: string | null,
@@ -32,12 +35,45 @@ export async function chatStream(
   const r = await fetch(`${BASE}/chat/stream`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...(await authHeadersAsync()) },
-    body: JSON.stringify({ message, mode, history, platform }),
+    body: JSON.stringify({ message, mode, history, platform, compact: true }),
   });
   if (!r.ok || !r.body) throw new Error(`chat ${r.status}`);
   const reader = r.body.getReader();
   const dec = new TextDecoder();
   let buf = "";
+
+  let pending: Record<string, unknown>[] = [];
+  let raf = 0;
+  const flush = () => {
+    raf = 0;
+    const batch = pending;
+    pending = [];
+    for (const e of batch) onEvent(e);
+  };
+  const dispatch = (e: Record<string, unknown>) => {
+    if (e.type === "delta") {
+      const last = pending[pending.length - 1];
+      if (last && last.type === "delta") {
+        last.text = (last.text as string) + (e.text as string);
+      } else {
+        pending.push({ ...e });
+      }
+      if (!raf && typeof requestAnimationFrame === "function") {
+        raf = requestAnimationFrame(flush);
+      } else if (!raf) {
+        // environments without rAF: keep ordering via microtask
+        Promise.resolve().then(flush);
+      }
+    } else {
+      if (raf) {
+        cancelAnimationFrame(raf);
+        raf = 0;
+      }
+      flush(); // emit pending deltas before the control event
+      onEvent(e);
+    }
+  };
+
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
@@ -48,12 +84,17 @@ export async function chatStream(
       const line = p.trim();
       if (!line.startsWith("data:")) continue;
       try {
-        onEvent(JSON.parse(line.slice(5)));
+        dispatch(JSON.parse(line.slice(5)));
       } catch {
         /* skip malformed */
       }
     }
   }
+  if (raf) {
+    cancelAnimationFrame(raf);
+    raf = 0;
+  }
+  flush(); // never drop the tail
 }
 
 export type Trend = {

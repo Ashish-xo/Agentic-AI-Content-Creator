@@ -86,28 +86,40 @@ async def stream_turn(
     persona: Persona | None,
     mode: str | None,
     platform: str | None = None,
+    compact: bool = False,
 ) -> AsyncIterator[dict[str, Any]]:
-    """Streaming turn. Yields events: {type: meta|trend|delta|done}."""
+    """Streaming turn. Yields events: {type: meta|trend|delta|done}.
+    compact=True (mobile): trends capped to 3, detail strings truncated to 80
+    chars, hook ids dropped — smaller meta frame for lossy 4G."""
     platform = platform or _pick_platform(user_text)
     rows = trends.query_trends(db, platform=platform, niche=persona.niche if persona else None)
     books = rag.retrieve(db, platform, user_text)
     hook_ex = fewshot.select_examples(db, platform, user_text, k=3)
     msgs = build_messages(user_text, history, persona, mode, rows,
                           rag.context_block(books), fewshot.chat_examples_block(hook_ex))
-    yield {"type": "meta", "mode": mode, "platform": platform,
-           "tools": ["trend_lookup", "rag_retrieve", "hook_rag"],
-           "trends_used": [
-               {"platform": r.platform, "kind": r.kind, "title": r.title, "heat": r.heat}
-               for r in rows[:5]
-           ],
-           "playbooks_used": [
-               {"id": b.id, "topic": b.topic, "platform": b.platform}
-               for b in books
-           ],
-           "hooks_used": [
-               {"id": e.id, "hook": e.hook, "archetype": e.archetype}
-               for e in hook_ex
-           ]}
+    if compact:
+        meta_event = {"type": "meta", "mode": mode, "platform": platform, "tools": [],
+                      "trends_used": [
+                          {"platform": r.platform, "title": r.title[:80], "heat": r.heat}
+                          for r in rows[:3]
+                      ],
+                      "playbooks_used": [], "hooks_used": []}
+    else:
+        meta_event = {"type": "meta", "mode": mode, "platform": platform,
+                      "tools": ["trend_lookup", "rag_retrieve", "hook_rag"],
+                      "trends_used": [
+                          {"platform": r.platform, "kind": r.kind, "title": r.title, "heat": r.heat}
+                          for r in rows[:5]
+                      ],
+                      "playbooks_used": [
+                          {"id": b.id, "topic": b.topic, "platform": b.platform}
+                          for b in books
+                      ],
+                      "hooks_used": [
+                          {"id": e.id, "hook": e.hook, "archetype": e.archetype}
+                          for e in hook_ex
+                      ]}
+    yield meta_event
     temp = modes.TEMPS.get(mode or "", 0.6)
     budget = modes.BUDGETS.get(mode or "", 2048)
     collected: list[str] = []
