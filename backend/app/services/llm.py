@@ -6,6 +6,7 @@ return a `reasoning_content` field alongside `content` — we only surface
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 from collections.abc import AsyncIterator
@@ -24,7 +25,10 @@ MODEL_PRESETS = {
 
 def _headers() -> dict[str, str]:
     s = get_settings()
-    return {"Authorization": f"Bearer {s.llm_api_key}", "Content-Type": "application/json"}
+    h = {"Content-Type": "application/json"}
+    if s.llm_api_key:  # keyless providers (e.g. Pollinations) must not send an empty Bearer
+        h["Authorization"] = f"Bearer {s.llm_api_key}"
+    return h
 
 
 def _url() -> str:
@@ -63,9 +67,12 @@ async def stream(
     temperature: float = 0.7,
     max_tokens: int = 2048,
     out_meta: dict[str, Any] | None = None,
+    retries: int = 3,
 ) -> AsyncIterator[str]:
     """Yield text deltas. Only `content` deltas — reasoning is dropped.
-    If out_meta is given, records finish_reason so callers can detect truncation."""
+    If out_meta is given, records finish_reason so callers can detect truncation.
+    Retries with backoff when the upstream returns 200-but-empty streams
+    (Pollinations anonymous tier silently throttles rapid consecutive calls)."""
     payload = {
         "model": model or get_settings().llm_model,
         "messages": messages,
@@ -73,39 +80,49 @@ async def stream(
         "max_tokens": max_tokens,
         "stream": True,
     }
-    async with httpx.AsyncClient(timeout=300) as client:
-        async with client.stream(
-            "POST", f"{_url()}/chat/completions", headers=_headers(), json=payload
-        ) as resp:
-            resp.raise_for_status()
-            # Mobile-tuned transport batching: accumulate token deltas and emit
-            # ~80-char chunks. Fewer, larger SSE frames = less per-frame overhead
-            # on lossy 4G (product budgets are unaffected — this is transport-only).
-            buf = ""
-            async for line in resp.aiter_lines():
-                if not line.startswith("data:"):
-                    continue
-                chunk = line[5:].strip()
-                if chunk == "[DONE]":
-                    return
-                try:
-                    obj: dict[str, Any] = json.loads(chunk)
-                except json.JSONDecodeError:
-                    continue
-                choices = obj.get("choices") or []
-                if not choices:
-                    continue
-                if out_meta is not None and choices[0].get("finish_reason"):
-                    out_meta["finish_reason"] = choices[0]["finish_reason"]
-                delta = choices[0].get("delta", {}) or {}
-                text = delta.get("content")
-                if text:
-                    buf += text
-                    if len(buf) >= 80:
-                        yield buf
-                        buf = ""
-            if buf:
-                yield buf
+    for attempt in range(retries + 1):
+        chunks: list[str] = []
+        async with httpx.AsyncClient(timeout=300) as client:
+            async with client.stream(
+                "POST", f"{_url()}/chat/completions", headers=_headers(), json=payload
+            ) as resp:
+                resp.raise_for_status()
+                # Mobile-tuned transport batching: accumulate token deltas and emit
+                # ~80-char chunks. Fewer, larger SSE frames = less per-frame overhead
+                # on lossy 4G (product budgets are unaffected — this is transport-only).
+                buf = ""
+                async for line in resp.aiter_lines():
+                    if not line.startswith("data:"):
+                        continue
+                    chunk = line[5:].strip()
+                    if chunk == "[DONE]":
+                        break
+                    try:
+                        obj: dict[str, Any] = json.loads(chunk)
+                    except json.JSONDecodeError:
+                        continue
+                    choices = obj.get("choices") or []
+                    if not choices:
+                        continue
+                    if out_meta is not None and choices[0].get("finish_reason"):
+                        out_meta["finish_reason"] = choices[0]["finish_reason"]
+                    delta = choices[0].get("delta", {}) or {}
+                    text = delta.get("content")
+                    if text:
+                        buf += text
+                        if len(buf) >= 80:
+                            chunks.append(buf)
+                            buf = ""
+                if buf:
+                    chunks.append(buf)
+        if chunks or attempt == retries:
+            for c in chunks:
+                yield c
+            return
+        # empty stream — backoff and retry (same meta reset)
+        if out_meta is not None:
+            out_meta.clear()
+        await asyncio.sleep(2 * (attempt + 1))
 
 
 _FENCE = re.compile(r"```(?:json)?\s*(.*?)```", re.DOTALL)
