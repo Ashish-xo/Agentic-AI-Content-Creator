@@ -24,6 +24,7 @@ class ChatIn(BaseModel):
     message: str = Field(min_length=1, max_length=8000)
     mode: str | None = None  # research|creation|optimization|auto|None
     platform: str | None = None  # youtube|instagram|None (UI toggle; else auto-detect)
+    niche: str | None = Field(default=None, max_length=200)  # UI niche picker; overrides persona if set
     history: list[dict[str, str]] = Field(default_factory=list, max_length=20)
     compact: bool = False  # mobile: slimmer meta events + tighter history cap
 
@@ -82,6 +83,11 @@ async def chat_stream(
         # --- normal copilot turn ---
         mode = _resolve_mode(body.mode, body.message)
         platform = body.platform if body.platform in ("youtube", "instagram") else None
+        # UI niche picker wins over persona; also syncs the persona so future
+        # onboarding-free turns and the digest job inherit it
+        if body.niche and body.niche != persona.niche:
+            persona.niche = body.niche
+            db.commit()
         history = _trim_history(body.history, body.compact)
         db.add(ChatMessage(user_id=user_id, role="user", content=body.message, mode=mode))
         db.commit()

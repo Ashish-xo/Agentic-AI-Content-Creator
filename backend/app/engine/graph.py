@@ -66,8 +66,9 @@ async def run_turn(
     """Non-streaming turn. Returns (answer, trend rows used)."""
     platform = platform or _pick_platform(user_text)
     rows = trends.query_trends(db, platform=platform, niche=persona.niche if persona else None)
-    books = rag.retrieve(db, platform, user_text)
-    hook_ex = fewshot.select_examples(db, platform, user_text, k=3)
+    books = rag.retrieve(db, platform, user_text, niche=persona.niche if persona else None)
+    hook_ex = fewshot.select_examples(db, platform, user_text, k=3,
+                                      niche=persona.niche if persona else None)
     msgs = build_messages(user_text, history, persona, mode, rows,
                           rag.context_block(books), fewshot.chat_examples_block(hook_ex))
     temp = modes.TEMPS.get(mode or "", 0.6)
@@ -96,8 +97,9 @@ async def stream_turn(
     chars, hook ids dropped — smaller meta frame for lossy 4G."""
     platform = platform or _pick_platform(user_text)
     rows = trends.query_trends(db, platform=platform, niche=persona.niche if persona else None)
-    books = rag.retrieve(db, platform, user_text)
-    hook_ex = fewshot.select_examples(db, platform, user_text, k=3)
+    books = rag.retrieve(db, platform, user_text, niche=persona.niche if persona else None)
+    hook_ex = fewshot.select_examples(db, platform, user_text, k=3,
+                                      niche=persona.niche if persona else None)
     msgs = build_messages(user_text, history, persona, mode, rows,
                           rag.context_block(books), fewshot.chat_examples_block(hook_ex))
     if compact:

@@ -32,11 +32,12 @@ export async function chatStream(
   history: { role: string; content: string }[],
   onEvent: (e: Record<string, unknown>) => void,
   platform: string | null = null,
+  niche: string | null = null,
 ): Promise<void> {
   const r = await fetch(`${BASE}/chat/stream`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...(await authHeadersAsync()) },
-    body: JSON.stringify({ message, mode, history, platform, compact: true }),
+    body: JSON.stringify({ message, mode, history, platform, niche, compact: true }),
   });
   if (r.status === 429) {
     // parse the structured limit payload so the UI can show a retry countdown

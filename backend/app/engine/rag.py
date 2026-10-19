@@ -33,10 +33,14 @@ def _lexical(rows: list[Playbook], query: str, k: int) -> list[Playbook]:
     return hits or [pb for _, pb in scored[:k]]
 
 
-def retrieve(db: Session, platform: str | None, query: str, k: int = 3) -> list[Playbook]:
+def retrieve(db: Session, platform: str | None, query: str, k: int = 3,
+             niche: str | None = None) -> list[Playbook]:
     scope = [platform, "cross"] if platform else None
+    # niche-aware query: blend the user's niche into the semantic search so
+    # playbooks relevant to their space rank higher (soft signal, not a filter)
+    effective_query = f"{niche} {query}".strip() if niche else query
     # vector path (Postgres + pgvector + embeddings present)
-    qvec = embed_bridge.embedding(query)
+    qvec = embed_bridge.embedding(effective_query)
     if qvec is not None and _pgvector_ready(db):
         try:
             params = {"qvec": str(qvec), "k": k}
@@ -56,11 +60,11 @@ def retrieve(db: Session, platform: str | None, query: str, k: int = 3) -> list[
                 return [rows[i] for i in ids if i in rows]
         except Exception as e:
             print(f"[rag] vector search failed ({e}) — lexical fallback")
-    # lexical fallback
+    # lexical fallback (niche-blended too)
     q = db.query(Playbook)
     if scope:
         q = q.filter(Playbook.platform.in_(scope))
-    return _lexical(q.all(), query, k)
+    return _lexical(q.all(), effective_query, k)
 
 
 _vector_ok: bool | None = None

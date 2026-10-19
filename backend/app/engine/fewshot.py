@@ -47,17 +47,26 @@ def seed_examples(db: Session) -> None:
         db.commit()
 
 
-def select_examples(db: Session, platform: str | None, topic: str, k: int = 4) -> list[HookExample]:
-    """Vector-first few-shot selection; lexical fallback (platform + topic overlap)."""
+def select_examples(db: Session, platform: str | None, topic: str, k: int = 4,
+                    niche: str | None = None) -> list[HookExample]:
+    """Vector-first few-shot selection; lexical fallback (platform + topic overlap).
+    niche: soft-boost hooks whose text overlaps the niche — never hard-filters,
+    so sparse niches still get topically-relevant few-shots."""
     rows = db.query(HookExample).all()
+    niche_words = {w.lower() for w in (niche or "").split() if len(w) > 3}
+
+    def _score(base: float, e: HookExample) -> float:
+        txt = (e.hook + " " + e.archetype).lower()
+        return base + (2.0 if any(w in txt for w in niche_words) else 0.0)
+
     qvec = embed_bridge.embedding(topic)
     if qvec is not None and rows and all(r.embedding is not None for r in rows):
         emb_map = {r.id: list(r.embedding) for r in rows}  # type: ignore[arg-type]
         try:
-            # cosine sim (vectors are normalized) + small same-platform bonus
+            # cosine sim (vectors are normalized) + same-platform bonus + niche boost
             scored = [
-                (sum(a * b for a, b in zip(qvec, emb_map[r.id]))
-                 + (0.1 if platform and r.platform == platform else 0), r)
+                (_score(sum(a * b for a, b in zip(qvec, emb_map[r.id]))
+                        + (0.1 if platform and r.platform == platform else 0), r), r)
                 for r in rows
             ]
             scored.sort(key=lambda x: -x[0])
@@ -69,7 +78,7 @@ def select_examples(db: Session, platform: str | None, topic: str, k: int = 4) -
     for e in rows:
         plat_bonus = 3 if platform and e.platform == platform else 0
         overlap = len(tt & _tokens(e.hook + " " + e.archetype))
-        scored.append((plat_bonus + overlap * 2, e))
+        scored.append((_score(plat_bonus + overlap * 2, e), e))
     scored.sort(key=lambda x: -x[0])
     return [e for _, e in scored[:k]]
 

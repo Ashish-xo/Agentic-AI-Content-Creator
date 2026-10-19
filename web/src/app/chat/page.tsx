@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { api, chatStream, type Persona } from "@/lib/api";
+import { getStoredNiche } from "@/lib/niche";
 
 type UsedContext = { trends: { title: string; platform: string; heat: number }[]; playbooks: { topic: string; platform: string }[]; hooks: { hook: string; archetype: string }[] };
 type Msg = { role: "user" | "assistant"; content: string; mode?: string | null; streaming?: boolean; context?: UsedContext };
@@ -29,8 +30,17 @@ export default function ChatPage() {
   const [busy, setBusy] = useState(false);
   const [persona, setPersona] = useState<Persona | null>(null);
   const [chips, setChips] = useState<string[]>([]);
+  const [niche, setNiche] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const pendingField = useRef<string | null>(null);
+
+  // live-follow the niche chip (AppShell dispatches on change)
+  useEffect(() => {
+    setNiche(getStoredNiche());
+    const onNiche = (e: Event) => setNiche((e as CustomEvent<string>).detail);
+    window.addEventListener("cc-niche-changed", onNiche);
+    return () => window.removeEventListener("cc-niche-changed", onNiche);
+  }, []);
 
   const loadPersona = useCallback(async () => {
     const p = await api.get<Persona>("/persona");
@@ -110,7 +120,7 @@ export default function ChatPage() {
         } else if (e.type === "error") {
           acc += `\n\n_(error: ${e.detail})_`;
         }
-      }, platform || null);
+      }, platform || null, niche);
     } catch (err) {
       const e = err as Error;
       if (e.name === "RateLimitError") {
