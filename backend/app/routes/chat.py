@@ -13,7 +13,7 @@ from app.core.auth import current_user
 from app.db.session import get_db
 from app.engine import cringe, graph, modes, onboarding
 from app.models.tables import ChatMessage
-from app.services.ratelimit import chat_limit
+from app.services.ratelimit import chat_limit_for
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +52,7 @@ async def chat_stream(
     user_id: str = Depends(current_user),
     db: Session = Depends(get_db),
 ):
-    await chat_limit.check(f"chat:{user_id}")
+    await chat_limit_for(db, user_id)
     persona = onboarding.get_or_create(db, user_id)
 
     async def event_gen():
@@ -112,7 +112,7 @@ async def chat_once(
     db: Session = Depends(get_db),
 ):
     """Non-streaming variant (tests + simple clients)."""
-    await chat_limit.check(f"chat:{user_id}")
+    await chat_limit_for(db, user_id)
     persona = onboarding.get_or_create(db, user_id)
     if not persona.completed:
         nxt, done = await onboarding.handle_answer(db, user_id, body.message)

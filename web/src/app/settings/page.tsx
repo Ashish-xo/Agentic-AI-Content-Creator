@@ -144,7 +144,8 @@ export default function SettingsPage() {
         </div>
         <p className="text-xs text-slate-500">
           Your key is encrypted before storage and never shown again. It is used only for
-          your requests — the free engine stays available if you skip this.
+          your requests. The free engine is shared and capped at ~8 chats/min — add your
+          own key for 30/min and faster models.
         </p>
         <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
           {BYOK_PROVIDERS.map((p) => (

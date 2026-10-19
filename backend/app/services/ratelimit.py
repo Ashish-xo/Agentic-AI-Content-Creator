@@ -50,8 +50,21 @@ class Limiter:
             return self._local(key)  # Redis down -> local guard still applies
 
 
-chat_limit = Limiter(30)
+chat_limit = Limiter(30)      # BYOK users — their key, their quota
+free_chat_limit = Limiter(8)  # free-engine users — protects the shared Pollinations tier
 http_limit = Limiter(120)
+gen_limit = Limiter(10)       # generate/critique/variants — heavier prompts per call
+
+
+async def chat_limit_for(db, user_id: str) -> None:
+    """BYOK users get the standard budget; free-engine users a stricter one."""
+    from app.services import byok
+
+    row = byok.get_user_key(db, user_id)
+    if row and row.provider and row.provider != "free":
+        await chat_limit.check(f"chat:{user_id}")
+    else:
+        await free_chat_limit.check(f"chat:{user_id}")
 
 
 async def guard_http(request: Request) -> None:

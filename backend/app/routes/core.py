@@ -12,6 +12,7 @@ from app.db.session import get_db
 from app.engine import generators, onboarding
 from app.models.tables import GeneratedItem, Persona, Project, UserKey
 from app.services import billing, byok, trends
+from app.services.ratelimit import gen_limit
 
 router = APIRouter(tags=["core"])
 
@@ -59,6 +60,7 @@ class VariantIn(BaseModel):
 @router.post("/api/generate/hooks")
 async def gen_hooks(body: HookIn, user_id: str = Depends(current_user),
                    db: Session = Depends(get_db)):
+    await gen_limit.check(f"gen:{user_id}")
     persona = db.query(Persona).filter(Persona.user_id == user_id).first()
     out = await generators.generate_hooks(body.topic, body.platform, body.count,
                                           persona.summary() if persona and persona.completed else None,
@@ -72,6 +74,7 @@ async def gen_hooks(body: HookIn, user_id: str = Depends(current_user),
 @router.post("/api/generate/script")
 async def gen_script(body: ScriptIn, user_id: str = Depends(current_user),
                      db: Session = Depends(get_db)):
+    await gen_limit.check(f"gen:{user_id}")
     persona = db.query(Persona).filter(Persona.user_id == user_id).first()
     script = await generators.generate_script(body.topic, body.platform, body.seconds,
                                               persona.summary() if persona and persona.completed else None,
@@ -85,6 +88,7 @@ async def gen_script(body: ScriptIn, user_id: str = Depends(current_user),
 @router.post("/api/generate/critique")
 async def gen_critique(body: CritiqueIn, user_id: str = Depends(current_user),
                        db: Session = Depends(get_db)):
+    await gen_limit.check(f"gen:{user_id}")
     persona = db.query(Persona).filter(Persona.user_id == user_id).first()
     out = await generators.critique_content(body.draft, body.platform,
                                             persona.summary() if persona and persona.completed else None,
@@ -99,6 +103,7 @@ async def gen_critique(body: CritiqueIn, user_id: str = Depends(current_user),
 async def gen_variants(body: VariantIn, user_id: str = Depends(current_user),
                        db: Session = Depends(get_db)):
     """Platform-switching: one premise -> per-platform variants, saved as a project."""
+    await gen_limit.check(f"gen:{user_id}")
     persona = db.query(Persona).filter(Persona.user_id == user_id).first()
     variants = await generators.make_variants(body.premise,
                                               persona.summary() if persona and persona.completed else None,
