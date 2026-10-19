@@ -38,6 +38,20 @@ export async function chatStream(
     headers: { "Content-Type": "application/json", ...(await authHeadersAsync()) },
     body: JSON.stringify({ message, mode, history, platform, compact: true }),
   });
+  if (r.status === 429) {
+    // parse the structured limit payload so the UI can show a retry countdown
+    let retryAfter = 60;
+    let limit = 0;
+    try {
+      const j = await r.json();
+      const d = j?.detail ?? j;
+      retryAfter = Number(d?.retry_after) || 60;
+      limit = Number(d?.limit) || 0;
+    } catch { /* opaque body — keep defaults */ }
+    const err = new Error(`rate_limited:${retryAfter}:${limit}`) as Error & { name: string };
+    err.name = "RateLimitError";
+    throw err;
+  }
   if (!r.ok || !r.body) throw new Error(`chat ${r.status}`);
   const reader = r.body.getReader();
   const dec = new TextDecoder();

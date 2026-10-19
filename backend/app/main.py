@@ -3,12 +3,14 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from sqlalchemy.orm import Session
 
+from app.core.auth import current_user
 from app.core.config import get_settings
-from app.db.session import Base, SessionLocal, engine
+from app.db.session import Base, SessionLocal, engine, get_db
 from app.engine import embed_bridge, fewshot, rag
 from app.engine.fewshot import seed_examples
 from app.models.tables import HookExample, Playbook
@@ -93,6 +95,35 @@ def create_app() -> FastAPI:
     @app.get("/api/health")
     async def health():
         return {"ok": True, "model": s.llm_model, "environment": s.environment}
+
+    @app.get("/api/me")
+    async def me(request: Request, user_id: str = Depends(current_user),
+                 db: Session = Depends(get_db)):
+        """Who am I as far as the backend cares: identity kind, rate-limit state,
+        active engine. Used by the UI to show 'limited, retry in Ns' badges."""
+        from app.core import visitor
+        from app.services import byok
+        from app.services.ratelimit import snapshot
+
+        key_row = byok.get_user_key(db, user_id)
+        return {
+            "identity": user_id if user_id.startswith("v-") else "fingerprint",
+            "authenticated": s.auth_enabled,
+            "engine": (key_row.provider if key_row and key_row.provider else "free"),
+            "rate_limit": snapshot(user_id),
+        }
+
+    @app.middleware("http")
+    async def visitor_cookie(request: Request, call_next):
+        from fastapi.responses import JSONResponse
+        from app.core import visitor
+        # resolve (and possibly mint) identity before any route sees the request
+        if request.url.path.startswith("/api"):
+            visitor.resolve(request)
+        response = await call_next(request)
+        if request.url.path.startswith("/api"):
+            visitor.attach(response, request)
+        return response
 
     app.include_router(chat.router)
     app.include_router(core.router)

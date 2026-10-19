@@ -112,7 +112,18 @@ export default function ChatPage() {
         }
       }, platform || null);
     } catch (err) {
-      setMsgs((m) => [...m, { role: "assistant", content: `Something broke: ${String(err)}` }]);
+      const e = err as Error;
+      if (e.name === "RateLimitError") {
+        const [, retry, limit] = e.message.split(":");
+        const secs = Math.ceil(Number(retry) || 60);
+        const limitNote = Number(limit) ? ` (free limit: ${limit}/min — add your own key in Settings for 30/min)` : "";
+        setMsgs((m) => [...m, {
+          role: "assistant",
+          content: `🚦 **Slow down** — you're sending messages faster than the free engine allows. Try again in **${secs}s**${limitNote}.`,
+        }]);
+      } else {
+        setMsgs((m) => [...m, { role: "assistant", content: `Something broke: ${String(err)}` }]);
+      }
     } finally {
       setMsgs((m) => m.map((x) => ({ ...x, streaming: false } as Msg)));
       setBusy(false);

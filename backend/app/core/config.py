@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     # BYOK — Fernet master key for encrypting user-supplied API keys at rest
     byok_secret: str = ""
 
+    # Visitor identity — HMAC secret for signed anonymous cookies (dev auth-off mode)
+    session_secret: str = ""
+
     # Auth — Clerk
     clerk_secret_key: str = ""
     clerk_issuer: str = ""  # optional exact expected iss (custom domain); empty = Clerk-domain allowlist

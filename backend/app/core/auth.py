@@ -19,7 +19,7 @@ import socket
 import time
 
 import httpx
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import jwt
 
@@ -113,10 +113,14 @@ async def _verify_jwt(token: str) -> str:
 
 async def current_user(
     creds: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    request: Request = None,
 ) -> str:
     s = get_settings()
-    if not s.auth_enabled:
-        return "dev-user"
-    if not creds:
-        raise HTTPException(401, "Not authenticated")
-    return await _verify_jwt(creds.credentials)
+    if s.auth_enabled:
+        if not creds:
+            raise HTTPException(401, "Not authenticated")
+        return await _verify_jwt(creds.credentials)
+    # auth off: stable per-visitor identity (signed cookie, IP fingerprint fallback)
+    from app.core import visitor
+
+    return visitor.resolve(request)
