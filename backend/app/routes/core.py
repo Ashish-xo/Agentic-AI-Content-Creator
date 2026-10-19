@@ -29,6 +29,42 @@ def get_trends(platform: str | None = None, limit: int = 12,
             for r in rows]
 
 
+# ---------- viral discovery (live search) ----------
+class ViralScanIn(BaseModel):
+    query: str = Field(min_length=1, max_length=200)
+    limit: int = Field(default=6, ge=1, le=10)
+
+
+class ViralIgIn(BaseModel):
+    urls: list[str] = Field(min_length=1, max_length=10)
+
+
+@router.post("/api/viral/scan")
+async def viral_scan(body: ViralScanIn, user_id: str = Depends(current_user),
+                     db: Session = Depends(get_db)):
+    """Live keyless YouTube search: freshest short-form videos for a niche,
+    velocity-scored (views/day). Also stored as trend signals for the RAG layer."""
+    from app.services import viral_scan
+    from app.services.ratelimit import gen_limit
+
+    await gen_limit.check(f"viral:{user_id}")
+    rows = await viral_scan.scan_youtube(body.query, limit=body.limit)
+    await viral_scan.refresh_viral(db, [body.query]) if rows else None
+    return {"query": body.query, "results": rows}
+
+
+@router.post("/api/viral/instagram")
+async def viral_instagram(body: ViralIgIn, user_id: str = Depends(current_user)):
+    """Score user-supplied Instagram reel URLs (IG blocks keyless discovery —
+    this verifies real numbers on reels you already have)."""
+    from app.services import viral_scan
+    from app.services.ratelimit import gen_limit
+
+    await gen_limit.check(f"viral:{user_id}")
+    rows = await viral_scan.scan_instagram(body.urls)
+    return {"results": rows}
+
+
 @router.post("/api/trends/refresh")
 async def refresh_trends(user_id: str = Depends(current_user), db: Session = Depends(get_db)):
     return await trends.refresh_all(db)

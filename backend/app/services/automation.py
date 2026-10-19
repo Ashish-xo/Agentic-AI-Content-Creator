@@ -32,6 +32,13 @@ async def _refresh(db_factory) -> None:
     db: Session = db_factory()
     try:
         await trends.refresh_all(db)
+        # viral discovery: scan the distinct niches users actually create in
+        niches = [n for n in db.query(Persona.niche).filter(
+            Persona.niche.isnot(None)).distinct().limit(5) if n and n[0]]
+        if niches:
+            from app.services import viral_scan
+            added = await viral_scan.refresh_viral(db, niches)
+            print(f"[viral] +{added} signals from {len(niches)} niche(s)")
     finally:
         db.close()
 
