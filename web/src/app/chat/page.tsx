@@ -142,6 +142,15 @@ export default function ChatPage() {
 
   return (
     <div className="flex h-full flex-col">
+      {/* niche lock banner — persistent, always visible */}
+      {niche && (
+        <div className="flex items-center gap-2 border-b border-edge bg-accent/10 px-3 py-1.5">
+          <span className="text-[11px] font-semibold text-accent">🔒 {niche}</span>
+          <span className="text-[11px] text-slate-500">
+            all hooks, scripts & trends locked to this niche
+          </span>
+        </div>
+      )}
       {/* toolbar: segmented platform control + scrollable mode chips */}
       <div className="border-b border-edge bg-panel px-3 py-2">
         <div role="tablist" aria-label="Platform"

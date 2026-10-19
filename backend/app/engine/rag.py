@@ -6,7 +6,9 @@ permanent fallback — SQLite tests, missing extension, or embed failures.
 """
 from __future__ import annotations
 
-from sqlalchemy import text as sql_text
+from typing import Any
+
+from sqlalchemy import or_, text as sql_text
 from sqlalchemy.orm import Session
 
 from app.engine import embed_bridge
@@ -33,37 +35,65 @@ def _lexical(rows: list[Playbook], query: str, k: int) -> list[Playbook]:
     return hits or [pb for _, pb in scored[:k]]
 
 
+def _niche_words(niche: str | None) -> set[str]:
+    """Map a niche label ('Fitness & Gym', 'fitness', 'Software & Coding') to the
+    canonical tag(s) used on niche-locked rows."""
+    if not niche:
+        return set()
+    TAGS = {
+        "fitness": {"fitness", "gym", "workout", "muscle", "health"},
+        "software": {"software", "coding", "code", "programming", "developer", "dev"},
+        "tech": {"tech", "technology", "gadget", "gadgets"},
+        "cooking": {"cooking", "food", "recipe", "kitchen"},
+        "business": {"business", "finance", "money", "investing"},
+        "vlogging": {"vlogging", "vlog", "lifestyle"},
+    }
+    low = niche.lower()
+    hits = set()
+    for tag, words in TAGS.items():
+        if any(w in low for w in words):
+            hits.add(tag)
+    return hits
+
+
 def retrieve(db: Session, platform: str | None, query: str, k: int = 3,
              niche: str | None = None) -> list[Playbook]:
+    """Strict-niche retrieval: when the user has a niche, only playbooks that are
+    cross-niche (niche IS NULL) or tagged with the matching niche are eligible."""
     scope = [platform, "cross"] if platform else None
-    # niche-aware query: blend the user's niche into the semantic search so
-    # playbooks relevant to their space rank higher (soft signal, not a filter)
+    tags = _niche_words(niche)
     effective_query = f"{niche} {query}".strip() if niche else query
     # vector path (Postgres + pgvector + embeddings present)
     qvec = embed_bridge.embedding(effective_query)
     if qvec is not None and _pgvector_ready(db):
         try:
-            params = {"qvec": str(qvec), "k": k}
+            params: dict[str, Any] = {"qvec": str(qvec), "k": k}
+            niche_sql = ""
+            if tags:
+                params["tags"] = sorted(tags)
+                niche_sql = " AND (niche IS NULL OR niche = ANY(:tags))"
             if scope:
                 params["scope"] = scope
                 sql = sql_text(
                     "SELECT id FROM playbooks WHERE platform = ANY(:scope) "
-                    "AND embedding IS NOT NULL "
-                    "ORDER BY embedding <=> CAST(:qvec AS vector) LIMIT :k")
+                    "AND embedding IS NOT NULL" + niche_sql +
+                    " ORDER BY embedding <=> CAST(:qvec AS vector) LIMIT :k")
             else:
                 sql = sql_text(
-                    "SELECT id FROM playbooks WHERE embedding IS NOT NULL "
-                    "ORDER BY embedding <=> CAST(:qvec AS vector) LIMIT :k")
+                    "SELECT id FROM playbooks WHERE embedding IS NOT NULL" + niche_sql +
+                    " ORDER BY embedding <=> CAST(:qvec AS vector) LIMIT :k")
             ids = [r[0] for r in db.execute(sql, params).fetchall()]
             if ids:
                 rows = {p.id: p for p in db.query(Playbook).filter(Playbook.id.in_(ids)).all()}
                 return [rows[i] for i in ids if i in rows]
         except Exception as e:
             print(f"[rag] vector search failed ({e}) — lexical fallback")
-    # lexical fallback (niche-blended too)
+    # lexical fallback — strict niche filter applies here too
     q = db.query(Playbook)
     if scope:
         q = q.filter(Playbook.platform.in_(scope))
+    if tags:
+        q = q.filter(or_(Playbook.niche.is_(None), Playbook.niche.in_(tags)))
     return _lexical(q.all(), effective_query, k)
 
 

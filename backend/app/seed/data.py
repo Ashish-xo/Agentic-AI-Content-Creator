@@ -2,6 +2,10 @@
 
 Real providers (YouTube Data API v3 / Apify / SerpAPI) layer on top of this
 floor when keys exist; without keys the app is fully functional on seed data.
+
+Niche tags: playbooks/hook-examples carrying `niche` labels are niche-locked —
+strict retrieval only serves them to matching niches. Cross-niche items
+(generic platform strategy) have niche=None and serve everyone.
 """
 from sqlalchemy.orm import Session
 
@@ -127,6 +131,80 @@ PLAYBOOKS: list[dict] = [
             "Re-time the hook per platform: YT viewers tolerate 5s setups, Reels viewers do not."
         ),
         keywords=["repurpose", "cross-platform", "variant", "adapt"],
+    ),
+    # ---- niche-locked playbooks (strict retrieval serves these only to the matching niche) ----
+    dict(
+        platform="cross", niche="software",
+        topic="Coding tutorial hooks: the bug-first cold open",
+        body=(
+            "Dev audiences bail on intros — open with the broken thing: the stack trace, the 500 "
+            "error, the 3-hour debugging spiral. Structure: bug (0-3s) -> false fix everyone tries "
+            "(3-10s) -> the actual one-liner (10-20s) -> why it works (tail). Show real terminals and "
+            "real repos; fake stock footage kills credibility instantly with this crowd. "
+            "Strong archetypes: 'I replaced 3 tools with 40 lines of Python', 'this lint rule "
+            "found a bug our whole team missed'."
+        ),
+        keywords=["coding", "programming", "developer", "bug", "tutorial", "software"],
+    ),
+    dict(
+        platform="cross", niche="tech",
+        topic="Tech review hooks: price-gap + torture test",
+        body=(
+            "Gadget content lives on specificity: exact price vs the category leader, exact "
+            "benchmark numbers, and a torture test nobody else runs (dropped it, froze it, ran it "
+            "for 72h). Cold open with the verdict for short-form, with the surprise for long-form "
+            "('the $12 gadget beat the $600 one — but not how you think'). Spec-sheet recitals "
+            "are retention poison; every spec must attach to a use case."
+        ),
+        keywords=["tech", "gadget", "review", "benchmark", "unboxing", "price"],
+    ),
+    dict(
+        platform="cross", niche="fitness",
+        topic="Fitness hooks: constraint + proof physique",
+        body=(
+            "Gym content converts on constraints (12 minutes, no equipment, bad knees) stacked "
+            "with visible proof (your own transformation or a client's). Cold-open patterns: "
+            "mid-set first frame, 'stop doing X in the gym' negatives, and day-1/day-90 splits. "
+            "Form-correction clips (‘you're doing squats wrong — here's the fix') outperform "
+            "generic motivation 3-to-1 for saves; motivation content wins reach, form content wins saves."
+        ),
+        keywords=["fitness", "gym", "workout", "muscle", "diet", "push-ups"],
+    ),
+    dict(
+        platform="cross", niche="cooking",
+        topic="Food hooks: the receipt shot + constraint recipes",
+        body=(
+            "Food audiences want feasibility: budget caps ($40 weekly haul), time caps (15-minute "
+            "dinners), equipment caps (one pan). Open on the finished dish or the money shot of the "
+            "process (cheese pull, sizzle, glaze) — never on ingredients alone. 'Receipts in "
+            "caption' builds trust and drives saves; recipe-in-caption value-dumps are the highest-save "
+            "format in the niche. ASMR audio layers (sizzle, chopping) carry muted autoplay."
+        ),
+        keywords=["cooking", "food", "recipe", "kitchen", "meal", "budget"],
+    ),
+    dict(
+        platform="cross", niche="business",
+        topic="Finance hooks: numbers in the first line",
+        body=(
+            "Business/finance audiences trust specifics, not vibes: revenue numbers, tax figures, "
+            "real invoices (redacted) in the first 3 seconds. Winning arcs: 'how I got my first "
+            "client' with actual outreach screenshots, 'I audited a failing business' teardowns, "
+            "and myth-busting ('LLCs don't do what you think'). Avoid guaranteed-return framing — "
+            "it kills credibility with sophisticated viewers and risks platform flags."
+        ),
+        keywords=["business", "finance", "money", "investing", "client", "revenue"],
+    ),
+    dict(
+        platform="cross", niche="vlogging",
+        topic="Vlog hooks: in-medias-res + serialized stakes",
+        body=(
+            "Vlogs die from 'hey guys welcome back' — open mid-event at the most dramatic moment, "
+            "then rewind ('so, three hours before this...'). Serialize: numbered days, countdown "
+            "arcs, and cliffhanger endings drive profile visits and next-video notifications. "
+            "Voiceover-with-b-roll context layers outperform talking-head recaps; keep talking-head "
+            "for reaction/emotion only. On Shorts, text-overlay context lets muted autoplay land the premise."
+        ),
+        keywords=["vlog", "lifestyle", "daily", "story", "day in the life"],
     ),
 ]
 

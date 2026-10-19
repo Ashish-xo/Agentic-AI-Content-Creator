@@ -69,6 +69,7 @@ class Playbook(Base):
     topic: Mapped[str] = mapped_column(String(128))
     body: Mapped[str] = mapped_column(Text)
     keywords: Mapped[list[str]] = mapped_column(JSON, default=list)
+    niche: Mapped[str | None] = mapped_column(String(64), index=True)  # None = cross-niche
     embedding: Mapped[list[float] | None] = mapped_column(_EMBEDDING_COL)
 
 
@@ -137,6 +138,7 @@ class HookExample(Base):
     hook: Mapped[str] = mapped_column(Text)
     archetype: Mapped[str] = mapped_column(String(64))
     metric: Mapped[str | None] = mapped_column(Text)  # why it performed
+    niche: Mapped[str | None] = mapped_column(String(64), index=True)  # None = cross-niche
     embedding: Mapped[list[float] | None] = mapped_column(_EMBEDDING_COL)
 
 
