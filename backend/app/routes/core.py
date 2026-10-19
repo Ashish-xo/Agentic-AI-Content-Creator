@@ -10,8 +10,8 @@ from app.core.auth import current_user
 from app.core.config import get_settings
 from app.db.session import get_db
 from app.engine import generators, onboarding
-from app.models.tables import GeneratedItem, Persona, Project
-from app.services import billing, trends
+from app.models.tables import GeneratedItem, Persona, Project, UserKey
+from app.services import billing, byok, trends
 
 router = APIRouter(tags=["core"])
 
@@ -62,7 +62,7 @@ async def gen_hooks(body: HookIn, user_id: str = Depends(current_user),
     persona = db.query(Persona).filter(Persona.user_id == user_id).first()
     out = await generators.generate_hooks(body.topic, body.platform, body.count,
                                           persona.summary() if persona and persona.completed else None,
-                                          db=db)
+                                          db=db, user_id=user_id)
     db.add(GeneratedItem(user_id=user_id, kind="hook", platform=body.platform,
                          topic=body.topic, payload=out))
     db.commit()
@@ -74,7 +74,8 @@ async def gen_script(body: ScriptIn, user_id: str = Depends(current_user),
                      db: Session = Depends(get_db)):
     persona = db.query(Persona).filter(Persona.user_id == user_id).first()
     script = await generators.generate_script(body.topic, body.platform, body.seconds,
-                                              persona.summary() if persona and persona.completed else None)
+                                              persona.summary() if persona and persona.completed else None,
+                                              db=db, user_id=user_id)
     db.add(GeneratedItem(user_id=user_id, kind="script", platform=body.platform,
                          topic=body.topic, payload=script))
     db.commit()
@@ -86,7 +87,8 @@ async def gen_critique(body: CritiqueIn, user_id: str = Depends(current_user),
                        db: Session = Depends(get_db)):
     persona = db.query(Persona).filter(Persona.user_id == user_id).first()
     out = await generators.critique_content(body.draft, body.platform,
-                                            persona.summary() if persona and persona.completed else None)
+                                            persona.summary() if persona and persona.completed else None,
+                                            db=db, user_id=user_id)
     db.add(GeneratedItem(user_id=user_id, kind="critique", platform=body.platform,
                          topic=body.draft[:80], payload=out))
     db.commit()
@@ -99,7 +101,8 @@ async def gen_variants(body: VariantIn, user_id: str = Depends(current_user),
     """Platform-switching: one premise -> per-platform variants, saved as a project."""
     persona = db.query(Persona).filter(Persona.user_id == user_id).first()
     variants = await generators.make_variants(body.premise,
-                                              persona.summary() if persona and persona.completed else None)
+                                              persona.summary() if persona and persona.completed else None,
+                                              db=db, user_id=user_id)
     proj = Project(user_id=user_id, name=body.project_name or body.premise[:60],
                    premise=body.premise, variants=variants)
     db.add(proj)
@@ -188,6 +191,70 @@ def latest_digest(user_id: str = Depends(current_user), db: Session = Depends(ge
     if not row:
         return {"body": None}
     return {"body": row.payload.get("body"), "created_at": row.created_at.isoformat()}
+
+
+# ---------- BYOK: per-user LLM credentials ----------
+class ByokIn(BaseModel):
+    provider: str = Field(pattern="^(free|groq|gemini|openrouter|openai|custom)$")
+    api_key: str | None = Field(default=None, max_length=400)
+    base_url: str | None = Field(default=None, max_length=256)
+    model: str | None = Field(default=None, max_length=128)
+
+
+@router.get("/api/llm-key")
+def get_llm_key(user_id: str = Depends(current_user), db: Session = Depends(get_db)):
+    """Masked view of the user's BYOK config — the raw key never leaves the server."""
+    row = byok.get_user_key(db, user_id)
+    if not row:
+        return {"provider": "free", "api_key_preview": None, "base_url": None,
+                "model": byok.PROVIDERS["free"]["model"], "label": byok.PROVIDERS["free"]["label"]}
+    key_preview = None
+    if row.api_key_enc:
+        try:
+            key_preview = byok.mask_key(byok.decrypt_key(row.api_key_enc))
+        except RuntimeError:
+            key_preview = "unreadable"
+    preset = byok.PROVIDERS.get(row.provider, byok.PROVIDERS["custom"])
+    return {"provider": row.provider, "api_key_preview": key_preview,
+            "base_url": row.base_url, "model": row.model or preset["model"],
+            "label": preset["label"]}
+
+
+@router.put("/api/llm-key")
+def put_llm_key(body: ByokIn, user_id: str = Depends(current_user), db: Session = Depends(get_db)):
+    row = byok.get_user_key(db, user_id)
+    if not row:
+        row = UserKey(user_id=user_id)
+        db.add(row)
+    row.provider = body.provider
+    if body.provider == "free":
+        row.api_key_enc = None
+        row.base_url = None
+        row.model = None
+    else:
+        if body.api_key:  # only overwrite when a new key is supplied
+            row.api_key_enc = byok.encrypt_key(body.api_key)
+        if body.provider == "custom":
+            if not body.base_url or not body.model:
+                from fastapi import HTTPException
+                raise HTTPException(422, "Custom provider needs base_url and model")
+            row.base_url = body.base_url
+            row.model = body.model
+        else:
+            preset = byok.PROVIDERS[body.provider]
+            row.base_url = None  # preset URL applies
+            row.model = body.model or preset["model"]
+    db.commit()
+    return {"ok": True, "provider": row.provider}
+
+
+@router.delete("/api/llm-key")
+def delete_llm_key(user_id: str = Depends(current_user), db: Session = Depends(get_db)):
+    row = byok.get_user_key(db, user_id)
+    if row:
+        db.delete(row)
+        db.commit()
+    return {"ok": True, "provider": "free"}
 
 
 # ---------- settings / billing ----------

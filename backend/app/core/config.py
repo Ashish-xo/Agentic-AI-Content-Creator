@@ -12,9 +12,12 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://postgres@localhost:5432/content_copilot"
 
     # LLM (OpenAI-compatible endpoint)
-    llm_base_url: str = "https://api.b.ai/v1"
+    llm_base_url: str = "https://text.pollinations.ai/openai/v1"
     llm_api_key: str = ""
-    llm_model: str = "qwen3.8-flash"
+    llm_model: str = "openai"
+
+    # BYOK — Fernet master key for encrypting user-supplied API keys at rest
+    byok_secret: str = ""
 
     # Auth — Clerk
     clerk_secret_key: str = ""

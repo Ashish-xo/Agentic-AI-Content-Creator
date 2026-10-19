@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from app.engine import cringe, fewshot, modes, rag
 from app.engine.onboarding import LABELS, FIELDS  # noqa: F401  (re-export for routes)
 from app.models.tables import Persona
-from app.services import llm, trends
+from app.services import byok, llm, trends
 
 SYSTEM_BASE = (
     "You are Content Copilot, an algorithm-aware assistant for creators on "
@@ -72,7 +72,10 @@ async def run_turn(
                           rag.context_block(books), fewshot.chat_examples_block(hook_ex))
     temp = modes.TEMPS.get(mode or "", 0.6)
     budget = modes.BUDGETS.get(mode or "", 2048)
-    answer = await llm.complete(msgs, temperature=temp, max_tokens=budget)
+    creds = byok.llm_credentials(db, persona.user_id if persona else "dev-user")
+    answer = await llm.complete(msgs, temperature=temp, max_tokens=budget,
+                                base_url=creds["base_url"], api_key=creds["api_key"],
+                                model=creds["model"])
     vs = cringe.scan(answer)
     if vs:
         answer += "\n\n> ⚠ filter: " + ", ".join(f'"{v.phrase}"' for v in vs) + " flagged as saturated."
@@ -122,9 +125,12 @@ async def stream_turn(
     yield meta_event
     temp = modes.TEMPS.get(mode or "", 0.6)
     budget = modes.BUDGETS.get(mode or "", 2048)
+    creds = byok.llm_credentials(db, persona.user_id if persona else "dev-user")
     collected: list[str] = []
     meta: dict[str, Any] = {}
-    async for delta in llm.stream(msgs, temperature=temp, max_tokens=budget, out_meta=meta):
+    async for delta in llm.stream(msgs, temperature=temp, max_tokens=budget, out_meta=meta,
+                                  base_url=creds["base_url"], api_key=creds["api_key"],
+                                  model=creds["model"]):
         collected.append(delta)
         yield {"type": "delta", "text": delta}
     if meta.get("finish_reason") == "length":

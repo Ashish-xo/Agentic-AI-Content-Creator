@@ -64,7 +64,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </nav>
         <AuthWidget enabled={CLERK_ON} />
         <div className="px-4 py-3 text-[11px] text-slate-500">
-          brain: qwen3.8-flash · b.ai
+          brain: gpt-oss-20b · Pollinations (free) — BYOK in settings
         </div>
       </aside>
 

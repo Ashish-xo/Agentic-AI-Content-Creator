@@ -10,7 +10,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.engine import cringe, fewshot
-from app.services import llm
+from app.services import byok, llm
 
 PERSONA_LINE = "Creator persona: {summary}"
 
@@ -38,10 +38,14 @@ async def generate_hooks(
     count: int = 3,
     persona: str | None = None,
     db: Session | None = None,
+    user_id: str = "dev-user",
 ) -> dict[str, Any]:
     """Dynamic few-shot: retrieve 3-5 real high-performing hooks closest to the
     topic/platform, ask the model to analyze them, then generate in that format.
     Output passes through the cringe filter; rejected items are reported, not shown."""
+    creds = byok.llm_credentials(db, user_id) if db is not None else {}
+    kw: dict[str, Any] = ({"base_url": creds["base_url"], "api_key": creds["api_key"],
+                           "model": creds["model"]} if creds else {})
     thumb = ", plus a matching thumbnail text pairing (max 4 words)" if platform == "youtube" else ""
     examples: list[Any] = []
     if db is not None:
@@ -66,6 +70,7 @@ async def generate_hooks(
             {"role": "user", "content": task},
         ],
         temperature=0.8,
+        **kw,
     )
     items = result if isinstance(result, list) else result.get("hooks", [])
     kept, rejected = _filter_hooks(items)
@@ -83,6 +88,7 @@ async def generate_hooks(
                     + json.dumps(items[:count], ensure_ascii=False)[:2000]},
             ],
             temperature=0.7,
+            **kw,
         )
         retry_items = retry if isinstance(retry, list) else retry.get("hooks", [])
         kept2, _ = _filter_hooks(retry_items)
@@ -98,7 +104,12 @@ async def generate_script(
     platform: str = "youtube",
     seconds: int = 30,
     persona: str | None = None,
+    db: Session | None = None,
+    user_id: str = "dev-user",
 ) -> dict[str, Any]:
+    creds = byok.llm_credentials(db, user_id) if db is not None else {}
+    kw: dict[str, Any] = ({"base_url": creds["base_url"], "api_key": creds["api_key"],
+                           "model": creds["model"]} if creds else {})
     script = await llm.complete_json(
         [
             {
@@ -114,6 +125,7 @@ async def generate_script(
         ],
         temperature=0.8,
         max_tokens=3072,
+        **kw,
     )
     # post-processing gate over the whole script text
     flat = json.dumps(script, ensure_ascii=False)
@@ -125,7 +137,12 @@ async def critique_content(
     draft: str,
     platform: str = "instagram",
     persona: str | None = None,
+    db: Session | None = None,
+    user_id: str = "dev-user",
 ) -> dict[str, Any]:
+    creds = byok.llm_credentials(db, user_id) if db is not None else {}
+    kw: dict[str, Any] = ({"base_url": creds["base_url"], "api_key": creds["api_key"],
+                           "model": creds["model"]} if creds else {})
     out = await llm.complete_json(
         [
             {
@@ -140,6 +157,7 @@ async def critique_content(
             {"role": "user", "content": f"Platform: {platform}\nDraft:\n{draft}"},
         ],
         temperature=0.4,
+        **kw,
     )
     # the rewritten version must itself pass the gate — reject it if not
     rewritten = str(out.get("rewritten", ""))
@@ -151,8 +169,12 @@ async def critique_content(
     return out
 
 
-async def make_variants(premise: str, persona: str | None = None) -> dict[str, Any]:
+async def make_variants(premise: str, persona: str | None = None,
+                        db: Session | None = None, user_id: str = "dev-user") -> dict[str, Any]:
     """Platform-switching context: one premise -> per-platform executions."""
+    creds = byok.llm_credentials(db, user_id) if db is not None else {}
+    kw: dict[str, Any] = ({"base_url": creds["base_url"], "api_key": creds["api_key"],
+                           "model": creds["model"]} if creds else {})
     out = await llm.complete_json(
         [
             {
@@ -171,6 +193,7 @@ async def make_variants(premise: str, persona: str | None = None) -> dict[str, A
         ],
         temperature=0.7,
         max_tokens=3072,
+        **kw,
     )
     vs = cringe.scan(json.dumps(out, ensure_ascii=False))
     return {**out, "filter_violations": cringe.violations_payload(vs)}

@@ -19,6 +19,7 @@ export const api = {
     req<T>(p, { method: "POST", body: body ? JSON.stringify(body) : undefined }),
   put: <T>(p: string, body?: unknown) =>
     req<T>(p, { method: "PUT", body: body ? JSON.stringify(body) : undefined }),
+  del: <T>(p: string) => req<T>(p, { method: "DELETE" }),
 };
 
 /** Stream SSE chat; onEvent per parsed event.

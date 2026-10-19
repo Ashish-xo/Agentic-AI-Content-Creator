@@ -1,8 +1,9 @@
 """LLM client — one interface over any OpenAI-compatible endpoint.
 
-Presets: b.ai (qwen3.8-flash / glm-5.2 / deepseek-v4-flash). Reasoning models
-return a `reasoning_content` field alongside `content` — we only surface
-`content`. JSON mode = prompt instruction + robust ```-fence / brace extraction.
+Default: Pollinations text API (free, keyless, gpt-oss-20b). BYOK requests
+pass base_url/api_key/model overrides per call. Reasoning models return a
+`reasoning_content` field alongside `content` — we only surface `content`.
+JSON mode = prompt instruction + robust ```-fence / brace extraction.
 """
 from __future__ import annotations
 
@@ -17,9 +18,7 @@ import httpx
 from app.core.config import get_settings
 
 MODEL_PRESETS = {
-    "qwen3.8-flash": {"label": "Qwen 3.8 Flash (b.ai)", "fast": True},
-    "glm-5.2": {"label": "GLM 5.2 (b.ai)", "fast": False},
-    "deepseek-v4-flash": {"label": "DeepSeek V4 Flash (b.ai)", "fast": True},
+    "openai": {"label": "Pollinations gpt-oss-20b (free)", "fast": True},
 }
 
 
@@ -44,6 +43,8 @@ async def complete(
     model: str | None = None,
     temperature: float = 0.7,
     max_tokens: int = 2048,
+    base_url: str | None = None,
+    api_key: str | None = None,
 ) -> str:
     payload = {
         "model": model or get_settings().llm_model,
@@ -52,8 +53,15 @@ async def complete(
         "max_tokens": max_tokens,
         "stream": False,
     }
+    url = (base_url or get_settings().llm_base_url).strip().rstrip("/")
+    if not url.endswith("/v1"):
+        url += "/v1"
+    hdrs = {"Content-Type": "application/json"}
+    key = api_key if api_key is not None else get_settings().llm_api_key
+    if key:  # keyless providers (e.g. Pollinations) must not send an empty Bearer
+        hdrs["Authorization"] = f"Bearer {key}"
     async with httpx.AsyncClient(timeout=180) as client:
-        r = await client.post(f"{_url()}/chat/completions", headers=_headers(), json=payload)
+        r = await client.post(f"{url}/chat/completions", headers=hdrs, json=payload)
         r.raise_for_status()
         data = r.json()
     msg = data["choices"][0]["message"]
@@ -68,11 +76,14 @@ async def stream(
     max_tokens: int = 2048,
     out_meta: dict[str, Any] | None = None,
     retries: int = 3,
+    base_url: str | None = None,
+    api_key: str | None = None,
 ) -> AsyncIterator[str]:
     """Yield text deltas. Only `content` deltas — reasoning is dropped.
     If out_meta is given, records finish_reason so callers can detect truncation.
     Retries with backoff when the upstream returns 200-but-empty streams
-    (Pollinations anonymous tier silently throttles rapid consecutive calls)."""
+    (Pollinations anonymous tier silently throttles rapid consecutive calls).
+    base_url/api_key override the global defaults (BYOK per-user credentials)."""
     payload = {
         "model": model or get_settings().llm_model,
         "messages": messages,
@@ -80,11 +91,18 @@ async def stream(
         "max_tokens": max_tokens,
         "stream": True,
     }
+    url = (base_url or get_settings().llm_base_url).strip().rstrip("/")
+    if not url.endswith("/v1"):
+        url += "/v1"
+    hdrs = {"Content-Type": "application/json"}
+    key = api_key if api_key is not None else get_settings().llm_api_key
+    if key:  # keyless providers (e.g. Pollinations) must not send an empty Bearer
+        hdrs["Authorization"] = f"Bearer {key}"
     for attempt in range(retries + 1):
         chunks: list[str] = []
         async with httpx.AsyncClient(timeout=300) as client:
             async with client.stream(
-                "POST", f"{_url()}/chat/completions", headers=_headers(), json=payload
+                "POST", f"{url}/chat/completions", headers=hdrs, json=payload
             ) as resp:
                 resp.raise_for_status()
                 # Mobile-tuned transport batching: accumulate token deltas and emit
